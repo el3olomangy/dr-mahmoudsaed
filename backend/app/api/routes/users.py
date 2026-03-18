@@ -3,8 +3,10 @@ from pydantic import BaseModel
 from typing import List, Optional
 from bson import ObjectId
 from bson.errors import InvalidId
+from datetime import datetime, timezone
 from ...core.database import get_db
 from ...core.dependencies import get_current_user, get_current_teacher, get_current_teacher_or_assistant
+from ...core.security import get_password_hash
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -37,7 +39,14 @@ class ProfileUpdate(BaseModel):
     governorate: Optional[str] = None
 
 
-# ====== /me أولًا — لازم قبل /{user_id} ======
+class AssistantCreate(BaseModel):
+    first_name: str
+    last_name: str
+    phone: str
+    password: str
+
+
+# ====== /me أولًا ======
 
 @router.get("/me/profile")
 async def get_my_profile(current_user=Depends(get_current_user)):
@@ -73,12 +82,47 @@ async def get_student_by_parent(parent_phone: str, db=Depends(get_db)):
     }
 
 
+# ====== إنشاء مساعد (المدرس فقط) ======
+
+@router.post("/assistants", status_code=201)
+async def create_assistant(data: AssistantCreate, current_user=Depends(get_current_teacher), db=Depends(get_db)):
+    existing = await db.users.find_one({"phone": data.phone})
+    if existing:
+        raise HTTPException(status_code=400, detail="رقم الهاتف مسجل بالفعل")
+
+    hashed = get_password_hash(data.password)
+    result = await db.users.insert_one({
+        "first_name": data.first_name,
+        "last_name": data.last_name,
+        "phone": data.phone,
+        "password": hashed,
+        "role": "assistant",
+        "is_active": True,
+        "device_id": None,
+        "enrolled_courses": [],
+        "created_at": datetime.now(timezone.utc),
+    })
+    return {
+        "id": str(result.inserted_id),
+        "first_name": data.first_name,
+        "last_name": data.last_name,
+        "phone": data.phone,
+        "role": "assistant",
+    }
+
+
 # ====== المدرس / المساعد ======
 
 @router.get("/", response_model=List[dict])
 async def get_all_students(current_user=Depends(get_current_teacher_or_assistant), db=Depends(get_db)):
     students = await db.users.find({"role": "student"}).to_list(1000)
     return [user_helper(s) for s in students]
+
+
+@router.get("/assistants-list", response_model=List[dict])
+async def get_all_assistants(current_user=Depends(get_current_teacher), db=Depends(get_db)):
+    assistants = await db.users.find({"role": "assistant"}).to_list(100)
+    return [user_helper(a) for a in assistants]
 
 
 @router.get("/{user_id}")
@@ -108,4 +152,18 @@ async def reset_device(user_id: str, current_user=Depends(get_current_teacher), 
     if not student:
         raise HTTPException(status_code=404, detail="الطالب مش موجود")
     await db.users.update_one({"_id": oid}, {"$set": {"device_id": None}})
-    return {"message": "تم reset الجهاز — الطالب يقدر يدخل من جهاز جديد"}
+    return {"message": "تم reset الجهاز"}
+
+
+# ====== حذف طالب (المدرس فقط) ======
+
+@router.delete("/{user_id}")
+async def delete_student(user_id: str, current_user=Depends(get_current_teacher), db=Depends(get_db)):
+    oid = validate_object_id(user_id)
+    student = await db.users.find_one({"_id": oid})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب مش موجود")
+    if student["role"] == "teacher":
+        raise HTTPException(status_code=403, detail="مش هينفع تحذف حساب مدرس")
+    await db.users.delete_one({"_id": oid})
+    return {"message": f"تم حذف حساب {student['first_name']} {student['last_name']}"}

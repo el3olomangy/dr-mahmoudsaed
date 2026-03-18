@@ -1,16 +1,23 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { KeyRound, CheckCircle, AlertCircle } from "lucide-react"
+import { KeyRound, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react"
+import { codesAPI } from "@/lib/api"
+import { useAuth } from "@/context/AuthContext"
+import Link from "next/link"
 
 export default function ActivateCodePage() {
   const [code, setCode] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle")
   const [message, setMessage] = useState("")
+  const [courseName, setCourseName] = useState("")
+  const { updateUser, user } = useAuth()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,22 +26,37 @@ export default function ActivateCodePage() {
     setIsLoading(true)
     setStatus("idle")
 
-    // TODO: Implement actual code activation
-    setTimeout(() => {
-      setIsLoading(false)
-      // Mock response
-      if (code === "TEST123") {
-        setStatus("success")
-        setMessage("تم تفعيل الكود بنجاح! يمكنك الآن الوصول لكورس الكيمياء العضوية")
-      } else {
-        setStatus("error")
-        setMessage("الكود غير صحيح أو منتهي الصلاحية. تأكد من الكود وحاول مرة أخرى")
+    try {
+      const data: any = await codesAPI.activate(code.trim())
+
+      // حدّث الـ enrolled_courses في الـ AuthContext
+      if (data.course_id && user) {
+        const updatedCourses = [...(user.enrolled_courses || []), data.course_id]
+        updateUser({ enrolled_courses: updatedCourses })
       }
-    }, 1500)
+
+      setCourseName(data.course_title || "الكورس")
+      setStatus("success")
+      setMessage(data.message || "تم تفعيل الكود بنجاح!")
+      setCode("")
+    } catch (err: any) {
+      setStatus("error")
+      setMessage(err.message || "الكود غير صحيح أو منتهي الصلاحية")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
     <div className="max-w-xl mx-auto">
+      <Link
+        href="/dashboard"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>العودة للرئيسية</span>
+      </Link>
+
       <Card>
         <CardHeader className="text-center">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -47,39 +69,58 @@ export default function ActivateCodePage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                type="text"
-                placeholder="مثال: ABC123XYZ"
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                className="text-center text-lg font-mono tracking-widest py-6"
-                dir="ltr"
-                maxLength={20}
-              />
-            </div>
+            <Input
+              type="text"
+              placeholder="مثال: ABC123XYZ"
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value.toUpperCase())
+                setStatus("idle")
+              }}
+              className="text-center text-lg font-mono tracking-widest py-6"
+              dir="ltr"
+              maxLength={20}
+              disabled={isLoading}
+            />
 
             {status === "success" && (
               <div className="flex items-start gap-3 p-4 bg-chart-3/10 border border-chart-3/30 rounded-xl">
-                <CheckCircle className="w-5 h-5 text-chart-3 flex-shrink-0 mt-0.5" />
-                <p className="text-chart-3 text-sm">{message}</p>
+                <CheckCircle className="w-5 h-5 text-chart-3 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-chart-3 font-bold text-sm">{message}</p>
+                  {courseName && (
+                    <p className="text-chart-3/80 text-sm mt-1">
+                      يمكنك الآن الوصول لـ <span className="font-bold">{courseName}</span>
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
             {status === "error" && (
               <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-xl">
-                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                 <p className="text-destructive text-sm">{message}</p>
               </div>
             )}
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6"
               disabled={isLoading || !code.trim()}
             >
               {isLoading ? "جاري التفعيل..." : "تفعيل الكود"}
             </Button>
+
+            {status === "success" && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => router.push("/dashboard/courses")}
+              >
+                عرض كورساتي
+              </Button>
+            )}
           </form>
 
           <div className="mt-6 p-4 bg-muted rounded-xl">

@@ -6,16 +6,26 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Phone, Lock, ArrowLeft } from "lucide-react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { authAPI } from "@/lib/api"
+import { useAuth } from "@/context/AuthContext"
 
 export default function LoginPage() {
   const [phone, setPhone] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [successMsg, setSuccessMsg] = useState("")
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { login } = useAuth()
+
+  useEffect(() => {
+    if (searchParams.get("registered") === "true") {
+      setSuccessMsg("تم إنشاء الحساب بنجاح! سجل دخول دلوقتي")
+    }
+  }, [searchParams])
 
   const getDeviceId = () => {
     let deviceId = localStorage.getItem("device_id")
@@ -38,13 +48,15 @@ export default function LoginPage() {
         device_id: getDeviceId(),
       })
 
-      localStorage.setItem("token", data.access_token)
-      localStorage.setItem("user", JSON.stringify(data.user))
+      // استخدم الـ AuthContext بدل localStorage مباشرة
+      login(data.access_token, data.user)
 
+      // بعد ما الـ login يتم، روح للصفحة المطلوبة أو الـ dashboard
+      const redirect = searchParams.get("redirect")
       if (data.user.role === "teacher" || data.user.role === "assistant") {
-        router.push("/dashboard/admin")
+        router.push(redirect || "/dashboard/admin")
       } else {
-        router.push("/dashboard")
+        router.push(redirect || "/dashboard")
       }
     } catch (err: any) {
       setError(err.message || "حصل خطأ — حاول تاني")
@@ -79,6 +91,13 @@ export default function LoginPage() {
               أدخل بياناتك للوصول لحسابك
             </p>
           </div>
+
+          {/* Success */}
+          {successMsg && (
+            <div className="mb-4 p-3 rounded-lg bg-chart-3/10 border border-chart-3/20 text-chart-3 text-sm text-center">
+              {successMsg}
+            </div>
+          )}
 
           {/* Error */}
           {error && (

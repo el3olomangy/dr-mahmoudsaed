@@ -1,81 +1,153 @@
-# ============================================
-# Python - Backend
-# ============================================
+# ==========================================
+# EL3OLOMANGY PLATFORM - GITIGNORE
+# ==========================================
 
-# البيئة الافتراضية (venv) - دي أكبر حاجة هتفرق في الحجم!
+# ------------------------------------------
+# 1. ENVIRONMENT & SECRETS (مهم جداً!)
+# ------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# ------------------------------------------
+# 2. PYTHON - VIRTUAL ENVIRONMENT
+# ------------------------------------------
 venv/
 env/
 ENV/
 .venv/
-*.pyc
+.virtualenv/
+pythonenv*/
+
+# ------------------------------------------
+# 3. PYTHON - CACHE & COMPILED
+# ------------------------------------------
 __pycache__/
-*.pyo
-*.pyd
-.Python
+*.py[cod]
+*$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
 
-# ملفات البيئة والأسرار
-.env
-.env.local
-.env.*.local
-.env.example
-
-# قواعد البيانات المحلية
-*.db
-*.sqlite
-*.sqlite3
-
-# ============================================
-# Node.js - Frontend
-# ============================================
-
-# node_modules دي أكبر مجلد في الفرونت إند!
+# ------------------------------------------
+# 4. NODE.JS / REACT
+# ------------------------------------------
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.npm
+.yarn-integrity
+.pnp.*
 package-lock.json
 yarn.lock
+pnpm-lock.yaml
 
-# مجلدات البناء (build)
-dist/
+# ------------------------------------------
+# 5. BUILD & DISTRIBUTION
+# ------------------------------------------
 build/
-.out/
+dist/
+out/
 .next/
+.nuxt/
+.cache/
+.parcel-cache/
+.vite/
+.vitepress/dist
+*.tsbuildinfo
 
-# ============================================
-# VS Code
-# ============================================
+# ------------------------------------------
+# 6. TESTING
+# ------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+
+# ------------------------------------------
+# 7. IDE & EDITOR FILES
+# ------------------------------------------
 .vscode/*
-!.vscode/settings.json
 !.vscode/extensions.json
-!.vscode/launch.json
-
-# ============================================
-# ملفات النظام (Windows)
-# ============================================
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-*.cab
-*.msi
-*.msm
-*.msp
-
-# ============================================
-# ملفات مؤقتة عامة
-# ============================================
-*.log
-*.tmp
-*.temp
-.DS_Store
+!.vscode/settings.json.example
+.idea/
 *.swp
 *.swo
 *~
+.DS_Store
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.code-workspace
 
-# ملفات الاختبار والتغطية
-htmlcov/
-.coverage
-.pytest_cache/
-.mypy_cache/
+# ------------------------------------------
+# 8. LOGS
+# ------------------------------------------
+logs/
+*.log
+*.log.*
+log/
+debug/
+
+# ------------------------------------------
+# 9. DATABASE
+# ------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+!schema.sql
+!migrations/
+
+# ------------------------------------------
+# 10. OS FILES
+# ------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------
+# 11. PROJECT SPECIFIC
+# ------------------------------------------
+structure.txt
+*.bak
+*.tmp
+.temp/
+tmp/

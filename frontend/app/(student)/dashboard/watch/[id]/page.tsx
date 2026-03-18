@@ -87,7 +87,7 @@ export default function WatchPage() {
           </div>
 
           {/* Custom Controls Overlay (placeholder) */}
-          <div className="absolute bottom-0 right-0 left-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 hover:opacity-100 transition-opacity">
+          <div className="absolute bottom-0 right-0 left-0 bg-linear-to-t from-black/80 to-transparent p-4 opacity-0 hover:opacity-100 transition-opacity">
             <div className="flex items-center justify-between text-white">
               <div className="flex items-center gap-3">
                 <button className="hover:text-primary transition-colors">

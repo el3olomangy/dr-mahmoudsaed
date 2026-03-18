@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Almarai } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { AuthProvider } from '@/context/AuthContext'
 import './globals.css'
 
 const almarai = Almarai({ 
@@ -44,7 +45,9 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body className={`${almarai.variable} font-sans antialiased`}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

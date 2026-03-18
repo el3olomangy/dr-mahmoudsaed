@@ -14,6 +14,7 @@ import {
   ChevronLeft
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/context/AuthContext"
 
 const menuItems = [
   { href: "/dashboard", label: "الصفحة الرئيسية", icon: Home },
@@ -23,6 +24,12 @@ const menuItems = [
   { href: "/dashboard/profile", label: "حسابي", icon: User },
 ]
 
+const gradeLabels: Record<string, string> = {
+  first_secondary: "الصف الأول الثانوي",
+  second_secondary: "الصف الثاني الثانوي",
+  third_secondary: "الصف الثالث الثانوي",
+}
+
 interface StudentSidebarProps {
   isOpen: boolean
   onClose: () => void
@@ -30,6 +37,12 @@ interface StudentSidebarProps {
 
 export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
   const pathname = usePathname()
+  const { user, logout } = useAuth()
+
+  const handleLogout = () => {
+    onClose()
+    logout()
+  }
 
   return (
     <>
@@ -77,8 +90,12 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
                 <User className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="font-bold text-foreground">أهلاً، محمد</p>
-                <p className="text-sm text-muted-foreground">الصف الثالث الثانوي</p>
+                <p className="font-bold text-foreground">
+                  أهلاً، {user?.first_name || "..."}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {user?.grade ? gradeLabels[user.grade] || user.grade : "طالب"}
+                </p>
               </div>
             </div>
           </div>
@@ -111,6 +128,7 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
             <Button 
               variant="ghost" 
               className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleLogout}
             >
               <LogOut className="w-5 h-5" />
               <span>تسجيل الخروج</span>

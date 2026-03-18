@@ -1,106 +1,59 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { KeyRound, PlayCircle, BookOpen } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { KeyRound, PlayCircle, BookOpen, RefreshCw } from "lucide-react"
+import { coursesAPI } from "@/lib/api"
 
-// Mock data
-const myCourses = [
-  {
-    id: 1,
-    title: "الكيمياء العضوية",
-    description: "شرح شامل للكيمياء العضوية للصف الثالث الثانوي",
-    thumbnail: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400&h=300&fit=crop",
-    progress: 65,
-    totalLectures: 24,
-    completedLectures: 16,
-    isSubscribed: true,
-  },
-  {
-    id: 2,
-    title: "الفيزياء الحديثة",
-    description: "الفيزياء الحديثة وميكانيكا الكم للثانوية العامة",
-    thumbnail: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400&h=300&fit=crop",
-    progress: 40,
-    totalLectures: 18,
-    completedLectures: 7,
-    isSubscribed: true,
-  },
-]
+interface Course {
+  id: string
+  title: string
+  description?: string
+  thumbnail?: string
+  lectures_count: number
+  is_enrolled: boolean
+  grade?: string
+}
 
-const availableCourses = [
-  {
-    id: 3,
-    title: "الأحياء - الوراثة",
-    description: "الوراثة والهندسة الوراثية للثانوية العامة",
-    thumbnail: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop",
-    totalLectures: 20,
-    isSubscribed: false,
-  },
-  {
-    id: 4,
-    title: "الكيمياء الكهربائية",
-    description: "الخلايا الكهربائية والتحليل الكهربائي",
-    thumbnail: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop",
-    totalLectures: 15,
-    isSubscribed: false,
-  },
-]
-
-function CourseCard({ course }: { course: typeof myCourses[0] | typeof availableCourses[0] }) {
-  const isSubscribed = 'isSubscribed' in course && course.isSubscribed
-
+function CourseCard({ course }: { course: Course }) {
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <div className="relative aspect-video">
-        <Image 
-          src={course.thumbnail}
-          alt={course.title}
-          fill
-          className="object-cover"
-        />
-        {!isSubscribed && (
+      <div className="relative aspect-video bg-muted">
+        {course.thumbnail ? (
+          <Image src={course.thumbnail} alt={course.title} fill className="object-cover" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <BookOpen className="w-10 h-10 text-muted-foreground" />
+          </div>
+        )}
+        {!course.is_enrolled && (
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-            <span className="bg-primary text-white px-4 py-2 rounded-full text-sm font-bold">
-              غير مشترك
-            </span>
+            <span className="bg-primary text-white px-4 py-2 rounded-full text-sm font-bold">غير مشترك</span>
           </div>
         )}
       </div>
       <CardContent className="p-4">
         <h3 className="font-bold text-lg text-foreground mb-1">{course.title}</h3>
-        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{course.description}</p>
-        
+        {course.description && (
+          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{course.description}</p>
+        )}
         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
           <span className="flex items-center gap-1">
             <PlayCircle className="w-4 h-4" />
-            {course.totalLectures} محاضرة
+            {course.lectures_count} محاضرة
           </span>
         </div>
-
-        {isSubscribed && 'progress' in course ? (
-          <>
-            <div className="mb-3">
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="text-muted-foreground">
-                  {course.completedLectures} من {course.totalLectures} محاضرة
-                </span>
-                <span className="font-bold text-primary">{course.progress}%</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary rounded-full transition-all"
-                  style={{ width: `${course.progress}%` }}
-                />
-              </div>
-            </div>
-            <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Link href={`/dashboard/courses/${course.id}`}>
-                <BookOpen className="w-4 h-4 ml-2" />
-                متابعة الكورس
-              </Link>
-            </Button>
-          </>
+        {course.is_enrolled ? (
+          <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Link href={`/dashboard/courses/${course.id}`}>
+              <BookOpen className="w-4 h-4 ml-2" />
+              متابعة الكورس
+            </Link>
+          </Button>
         ) : (
           <Button asChild variant="outline" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
             <Link href="/dashboard/activate">
@@ -114,21 +67,78 @@ function CourseCard({ course }: { course: typeof myCourses[0] | typeof available
   )
 }
 
+function CourseSkeleton() {
+  return (
+    <div className="rounded-xl overflow-hidden border border-border">
+      <Skeleton className="aspect-video w-full" />
+      <div className="p-4 space-y-2">
+        <Skeleton className="h-5 w-3/4" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-9 w-full mt-2" />
+      </div>
+    </div>
+  )
+}
+
 export default function CoursesPage() {
+  const [courses, setCourses] = useState<Course[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    fetchCourses()
+  }, [])
+
+  const fetchCourses = async () => {
+    setIsLoading(true)
+    setError("")
+    try {
+      const data = await coursesAPI.getAll() as Course[]
+      setCourses(data)
+    } catch (err: any) {
+      setError(err.message || "حصل خطأ في تحميل الكورسات")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const myCourses = courses.filter(c => c.is_enrolled)
+  const availableCourses = courses.filter(c => !c.is_enrolled)
+
   return (
     <div className="space-y-8">
+
+      {/* Error state */}
+      {error && (
+        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center justify-between">
+          <p className="text-destructive text-sm">{error}</p>
+          <Button variant="ghost" size="sm" onClick={fetchCourses}>
+            <RefreshCw className="w-4 h-4 ml-1" />
+            إعادة المحاولة
+          </Button>
+        </div>
+      )}
+
       {/* My Courses */}
       <section>
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl font-bold">كورساتي</CardTitle>
+            <CardTitle className="text-xl font-bold">
+              كورساتي
+              {!isLoading && myCourses.length > 0 && (
+                <span className="mr-2 text-sm font-normal text-muted-foreground">({myCourses.length})</span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {myCourses.length > 0 ? (
+            {isLoading ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {myCourses.map((course) => (
-                  <CourseCard key={course.id} course={course} />
-                ))}
+                {[1, 2, 3].map(i => <CourseSkeleton key={i} />)}
+              </div>
+            ) : myCourses.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {myCourses.map(course => <CourseCard key={course.id} course={course} />)}
               </div>
             ) : (
               <div className="text-center py-12">
@@ -147,20 +157,31 @@ export default function CoursesPage() {
       </section>
 
       {/* Available Courses */}
-      <section>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl font-bold">كورسات متاحة</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {availableCourses.map((course) => (
-                <CourseCard key={course.id} course={course} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      {(isLoading || availableCourses.length > 0) && (
+        <section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-bold">
+                كورسات متاحة
+                {!isLoading && availableCourses.length > 0 && (
+                  <span className="mr-2 text-sm font-normal text-muted-foreground">({availableCourses.length})</span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2].map(i => <CourseSkeleton key={i} />)}
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {availableCourses.map(course => <CourseCard key={course.id} course={course} />)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      )}
     </div>
   )
 }
