@@ -39,12 +39,22 @@ interface Exam {
   questions: Question[]
 }
 
+interface EssayReview {
+  question_text: string
+  essay_answer: string
+  earned_points: number
+  max_points: number
+  teacher_comment: string
+}
+
 interface ExamResult {
   score: number
   passed: boolean
   earned_points: number
   total_points: number
   submitted_at: string
+  essay_fully_reviewed?: boolean
+  essay_reviews?: EssayReview[]
 }
 
 type ExamState = "loading" | "error" | "already_done" | "intro" | "taking" | "submitting" | "result"
@@ -230,6 +240,29 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
             <div className={`p-4 rounded-xl font-bold text-lg ${previousResult.passed ? "bg-chart-3/10 text-chart-3" : "bg-destructive/10 text-destructive"}`}>
               {previousResult.passed ? "ناجح ✓" : "لم تنجح"}
             </div>
+            {/* تصحيح المقالي */}
+            {previousResult.essay_fully_reviewed && previousResult.essay_reviews && previousResult.essay_reviews.length > 0 && (
+              <div className="text-right space-y-3">
+                <h3 className="font-bold text-sm text-foreground">تصحيح الأسئلة المقالية:</h3>
+                {previousResult.essay_reviews.map((rev, i) => (
+                  <div key={i} className="p-3 rounded-xl border border-border bg-muted/30 space-y-2">
+                    <p className="font-bold text-sm">{i + 1}. {rev.question_text}</p>
+                    <p className="text-xs text-muted-foreground">إجابتك: <span className="text-foreground">{rev.essay_answer || "لم تجب"}</span></p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-primary">{rev.earned_points} / {rev.max_points} درجة</span>
+                      {rev.teacher_comment && (
+                        <span className="text-xs text-muted-foreground italic">"{rev.teacher_comment}"</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!previousResult.essay_fully_reviewed && (
+              <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl text-sm text-orange-700 dark:text-orange-400 text-center">
+                الأسئلة المقالية لسه في انتظار تصحيح المدرس
+              </div>
+            )}
             <Button asChild variant="outline" className="w-full">
               <Link href="/dashboard/courses">
                 <ArrowRight className="w-4 h-4 ml-2" />

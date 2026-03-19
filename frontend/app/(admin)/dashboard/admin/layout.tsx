@@ -16,12 +16,17 @@ import {
   LogOut,
   Menu,
   ChevronLeft,
+  ClipboardList,
+  FileText,
 } from "lucide-react"
 
 const menuItems = [
   { href: "/dashboard/admin", label: "الرئيسية", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/admin/students", label: "الطلاب", icon: Users },
   { href: "/dashboard/admin/courses", label: "الكورسات", icon: BookOpen },
+  { href: "/dashboard/admin/exams", label: "الاختبارات", icon: ClipboardList, exact: true },
+  { href: "/dashboard/admin/exams/review", label: "تصحيح المقالي", icon: FileText, exact: true },
+  { href: "/dashboard/admin/notifications", label: "الإشعارات", icon: Bell },
   { href: "/dashboard/admin/codes", label: "الأكواد", icon: KeyRound },
 ]
 

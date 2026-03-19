@@ -25,6 +25,7 @@ class ExamCreate(BaseModel):
     duration_minutes: int = Field(default=30, ge=5)
     pass_score: int = Field(default=50, ge=0, le=100)
     show_result_immediately: bool = True
+    scheduled_at: Optional[str] = None
     questions: List[QuestionCreate] = []
 
 class AnswerSubmit(BaseModel):

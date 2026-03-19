@@ -13,7 +13,8 @@ import {
   FileCheck,
   AlertCircle,
 } from "lucide-react"
-import { coursesAPI, examsAPI } from "@/lib/api"
+import { coursesAPI, examsAPI, progressAPI } from "@/lib/api"
+import { getEmbedUrl, detectVideoType } from "@/lib/utils/video"
 import { useAuth } from "@/context/AuthContext"
 
 interface Lecture {
@@ -93,6 +94,9 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
             setCourseName(fullCourse.title)
             setUnitName(foundUnit?.title || "")
 
+            // سجّل إن الطالب شاف المحاضرة دي
+            progressAPI.markWatched(lectureId).catch(() => {})
+
             const idx = allLectures.findIndex((l: Lecture) => l.id === lectureId)
             setPrevLectureId(idx > 0 ? allLectures[idx - 1].id : null)
             setNextLectureId(idx < allLectures.length - 1 ? allLectures[idx + 1].id : null)
@@ -167,29 +171,39 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
 
       <Card className="overflow-hidden">
         <div className="relative aspect-video bg-black">
-          {lecture.video_url ? (
-            <>
-              <iframe
-                src={lecture.video_url}
-                className="absolute inset-0 w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-              {studentWatermark && (
-                <div
-                  className="absolute text-white/40 text-sm font-bold pointer-events-none select-none transition-all duration-1000 z-10"
-                  style={{
-                    left: `${watermarkPosition.x}%`,
-                    top: `${watermarkPosition.y}%`,
-                    transform: "translate(-50%, -50%)",
-                    textShadow: "1px 1px 2px rgba(0,0,0,0.8)",
-                  }}
-                >
-                  {studentWatermark}
-                </div>
-              )}
-            </>
-          ) : (
+          {lecture.video_url ? (() => {
+            const embedUrl = getEmbedUrl(lecture.video_url)
+            const videoType = detectVideoType(lecture.video_url)
+            return (
+              <>
+                <iframe
+                  key={embedUrl}
+                  src={embedUrl}
+                  className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  sandbox={videoType === "drive"
+                    ? "allow-scripts allow-same-origin allow-forms allow-popups"
+                    : "allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+                  }
+                />
+                {studentWatermark && (
+                  <div
+                    className="absolute text-white/40 text-sm font-bold pointer-events-none select-none transition-all duration-1000 z-10"
+                    style={{
+                      left: `${watermarkPosition.x}%`,
+                      top: `${watermarkPosition.y}%`,
+                      transform: "translate(-50%, -50%)",
+                      textShadow: "1px 1px 2px rgba(0,0,0,0.8)",
+                    }}
+                  >
+                    {studentWatermark}
+                  </div>
+                )}
+              </>
+            )
+          })() : (
             <div className="absolute inset-0 flex items-center justify-center text-white/60">
               <p>الفيديو مش متاح</p>
             </div>

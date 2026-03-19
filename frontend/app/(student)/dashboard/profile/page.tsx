@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,7 +10,7 @@ import {
   BookOpen, PlayCircle, FileCheck, CheckCircle, AlertCircle
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import { usersAPI } from "@/lib/api"
+import { usersAPI, progressAPI } from "@/lib/api"
 
 const gradeLabels: Record<string, string> = {
   first_secondary: "الصف الأول الثانوي",
@@ -38,6 +38,51 @@ export default function ProfilePage() {
     governorate: user?.governorate || "",
   })
   const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [stats, setStats] = useState({ watched: 0, exams_taken: 0, exams_passed: 0 })
+
+  // جيب أحدث بيانات الطالب من الـ API وحدّث الـ AuthContext
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [profileData, coursesData]: [any, any] = await Promise.all([
+          usersAPI.getMyProfile(),
+          // جيب الكورسات الموجودة فعلاً عشان نفلتر المحذوفة
+          import("@/lib/api").then(m => m.coursesAPI.getAll()),
+        ])
+
+        // فلتر الـ enrolled_courses بالكورسات الموجودة فعلاً
+        const existingCourseIds = new Set(coursesData.map((c: any) => c.id))
+        const validCourses = (profileData.enrolled_courses || []).filter(
+          (id: string) => existingCourseIds.has(id)
+        )
+
+        updateUser({
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          governorate: profileData.governorate,
+          enrolled_courses: validCourses,
+        })
+        setEditName({
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          governorate: profileData.governorate || "",
+        })
+
+        // جيب إحصائيات التقدم من الكورسات الموجودة بس
+        let totalWatched = 0, totalTaken = 0, totalPassed = 0
+        await Promise.all(validCourses.map(async (courseId: string) => {
+          try {
+            const p: any = await progressAPI.getCourseProgress(courseId)
+            totalWatched += p.watched || 0
+            totalTaken += p.exam_stats?.taken || 0
+            totalPassed += p.exam_stats?.passed || 0
+          } catch {}
+        }))
+        setStats({ watched: totalWatched, exams_taken: totalTaken, exams_passed: totalPassed })
+      } catch {}
+    }
+    loadData()
+  }, [])
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -237,12 +282,12 @@ export default function ProfilePage() {
         <CardContent>
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: "كورسات مشترك", value: user?.enrolled_courses?.length || 0, icon: BookOpen },
-              { label: "اختبارات محلولة", value: "—", icon: FileCheck },
-              { label: "متوسط النتائج", value: "—", icon: PlayCircle },
+              { label: "كورسات مشترك", value: user?.enrolled_courses?.length || 0, icon: BookOpen, color: "text-primary" },
+              { label: "محاضرات اتشافت", value: stats.watched, icon: PlayCircle, color: "text-chart-4" },
+              { label: "اختبارات اتجازت", value: `${stats.exams_passed}/${stats.exams_taken}`, icon: FileCheck, color: "text-chart-3" },
             ].map((stat, i) => (
               <div key={i} className="text-center p-4 bg-muted/50 rounded-xl">
-                <stat.icon className="w-8 h-8 text-primary mx-auto mb-2" />
+                <stat.icon className={`w-8 h-8 ${stat.color} mx-auto mb-2`} />
                 <p className="text-2xl font-extrabold text-foreground">{stat.value}</p>
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
               </div>

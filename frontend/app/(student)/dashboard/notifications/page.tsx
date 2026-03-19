@@ -50,7 +50,12 @@ export default function NotificationsPage() {
       const data = await notificationsAPI.getAll() as Notification[]
       setNotifications(data)
     } catch (err: any) {
-      setError(err.message || "حصل خطأ في تحميل الإشعارات")
+      const msg = err.message || ""
+      if (msg === "Failed to fetch" || msg.includes("fetch")) {
+        setError("تعذر الاتصال بالسيرفر — تأكد إن الإنترنت شغال وحاول تاني")
+      } else {
+        setError(msg || "حصل خطأ في تحميل الإشعارات")
+      }
     } finally {
       setIsLoading(false)
     }

@@ -4,7 +4,8 @@ from datetime import timedelta
 from ...core.database import get_db
 from ...core.security import (
     verify_password, get_password_hash,
-    create_access_token, create_refresh_token, decode_token
+    create_access_token, create_refresh_token, decode_token,
+    blacklist_token, is_token_blacklisted,
 )
 from ...core.dependencies import get_current_user
 from ...core.config import settings
@@ -101,6 +102,10 @@ async def login(data: UserLogin):
 
 @router.post("/refresh")
 async def refresh_token(data: RefreshRequest):
+    # تحقق إن التوكن مش في الـ blacklist
+    if await is_token_blacklisted(data.refresh_token):
+        raise HTTPException(status_code=401, detail="Refresh token منتهي أو تم تسجيل الخروج")
+
     payload = decode_token(data.refresh_token, token_type="refresh")
     if not payload:
         raise HTTPException(status_code=401, detail="Refresh token غير صالح أو منتهي")
@@ -115,14 +120,27 @@ async def refresh_token(data: RefreshRequest):
     if not user or not user.get("is_active"):
         raise HTTPException(status_code=401, detail="الحساب غير موجود أو موقوف")
 
+    # بطّل التوكن القديم واعمل واحد جديد (Refresh Token Rotation)
+    await blacklist_token(data.refresh_token)
     new_access = create_access_token(data={"sub": user_id, "role": role})
-    return {"access_token": new_access, "token_type": "bearer"}
+    new_refresh = create_refresh_token(data={"sub": user_id, "role": role})
+
+    return {
+        "access_token": new_access,
+        "refresh_token": new_refresh,
+        "token_type": "bearer",
+    }
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
 
 
 # ====== تسجيل الخروج ======
 
 @router.post("/logout")
-async def logout(current_user=Depends(get_current_user)):
+async def logout(data: LogoutRequest, current_user=Depends(get_current_user)):
+    await blacklist_token(data.refresh_token)
     return {"message": "تم تسجيل الخروج بنجاح"}
 
 

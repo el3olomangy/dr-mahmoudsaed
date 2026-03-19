@@ -36,7 +36,6 @@ async def create_notification(data: NotificationCreate, current_user=Depends(get
 async def get_my_notifications(current_user=Depends(get_current_user), db=Depends(get_db)):
     user_id = str(current_user["_id"])
     grade = current_user.get("grade")
-
     query = {
         "$or": [
             {"target_user_id": user_id},
@@ -44,18 +43,10 @@ async def get_my_notifications(current_user=Depends(get_current_user), db=Depend
             {"target_grade": None, "target_user_id": None},
         ]
     }
-
     notifications = await db.notifications.find(query).sort("created_at", -1).to_list(100)
     return [notification_helper(n, user_id) for n in notifications]
 
-@router.patch("/{notification_id}/read")
-async def mark_as_read(notification_id: str, current_user=Depends(get_current_user), db=Depends(get_db)):
-    user_id = str(current_user["_id"])
-    await db.notifications.update_one(
-        {"_id": ObjectId(notification_id)},
-        {"$addToSet": {"read_by": user_id}}
-    )
-    return {"message": "تم تحديد الإشعار كمقروء"}
+# ====== الثابتة أولاً — قبل /{notification_id} ======
 
 @router.patch("/read-all")
 async def mark_all_read(current_user=Depends(get_current_user), db=Depends(get_db)):
@@ -88,3 +79,14 @@ async def get_unread_count(current_user=Depends(get_current_user), db=Depends(ge
     }
     count = await db.notifications.count_documents(query)
     return {"unread_count": count}
+
+# ====== /{notification_id} الأخير دايماً ======
+
+@router.patch("/{notification_id}/read")
+async def mark_as_read(notification_id: str, current_user=Depends(get_current_user), db=Depends(get_db)):
+    user_id = str(current_user["_id"])
+    await db.notifications.update_one(
+        {"_id": ObjectId(notification_id)},
+        {"$addToSet": {"read_by": user_id}}
+    )
+    return {"message": "تم تحديد الإشعار كمقروء"}

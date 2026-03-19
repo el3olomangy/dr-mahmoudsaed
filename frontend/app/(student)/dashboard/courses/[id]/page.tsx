@@ -8,45 +8,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import {
-  PlayCircle,
-  FileText,
-  Lock,
-  ArrowRight,
-  AlertCircle,
-  BookOpen,
-  Clock,
+  PlayCircle, FileText, FileCheck, Lock,
+  ArrowRight, AlertCircle, BookOpen, Clock, ExternalLink,
 } from "lucide-react"
-import { coursesAPI } from "@/lib/api"
+import { coursesAPI, examsAPI, progressAPI } from "@/lib/api"
+import { getImageUrl } from "@/lib/utils/image"
 
 interface Lecture {
-  id: string
-  title: string
-  description?: string
-  video_url?: string
-  pdf_url?: string
-  order: number
-  lecture_type: string
-  duration_minutes?: number
-  is_enrolled: boolean
+  id: string; title: string; description?: string
+  video_url?: string; pdf_url?: string; order: number
+  lecture_type: string; duration_minutes?: number; is_enrolled: boolean
 }
-
-interface Unit {
-  id: string
-  title: string
-  order: number
-  lectures: Lecture[]
-}
-
+interface Unit { id: string; title: string; order: number; lectures: Lecture[] }
 interface Course {
-  id: string
-  title: string
-  description?: string
-  grade: string
-  price?: number
-  thumbnail?: string
-  units: Unit[]
-  is_enrolled: boolean
+  id: string; title: string; description?: string; grade: string
+  price?: number; thumbnail?: string; units: Unit[]; is_enrolled: boolean
 }
+interface ExamInfo { id: string; title: string; duration_minutes: number; lecture_id: string | null }
 
 const gradeLabels: Record<string, string> = {
   first_secondary: "الصف الأول الثانوي",
@@ -54,30 +32,28 @@ const gradeLabels: Record<string, string> = {
   third_secondary: "الصف الثالث الثانوي",
 }
 
-function getLectureIcon(lecture: Lecture) {
-  if (!lecture.is_enrolled) return <Lock className="w-5 h-5 text-muted-foreground" />
-  if (lecture.pdf_url && !lecture.video_url) return <FileText className="w-5 h-5 text-secondary" />
-  return <PlayCircle className="w-5 h-5 text-primary" />
-}
-
 export default function CourseDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: courseId } = use(params)
   const [course, setCourse] = useState<Course | null>(null)
+  const [exams, setExams] = useState<ExamInfo[]>([])
+  const [progress, setProgress] = useState<{watched:number;total_lectures:number;percentage:number;exam_stats:{taken:number;passed:number}} | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
 
   useEffect(() => {
     const fetchCourse = async () => {
-      setIsLoading(true)
-      setError("")
+      setIsLoading(true); setError("")
       try {
-        const data = await coursesAPI.getOne(courseId) as Course
-        setCourse(data)
+        const [data, examsData, progressData] = await Promise.all([
+          coursesAPI.getOne(courseId) as Promise<Course>,
+          examsAPI.getByCourse(courseId).catch(() => []) as Promise<ExamInfo[]>,
+          progressAPI.getCourseProgress(courseId).catch(() => null) as Promise<any>,
+        ])
+        setCourse(data); setExams(examsData)
+        if (progressData) setProgress(progressData)
       } catch (err: any) {
         setError(err.message || "حصل خطأ في تحميل الكورس")
-      } finally {
-        setIsLoading(false)
-      }
+      } finally { setIsLoading(false) }
     }
     fetchCourse()
   }, [courseId])
@@ -93,14 +69,11 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ id: st
           <CardContent className="p-6 space-y-3">
             <Skeleton className="h-6 w-1/3" />
             <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-3 w-2/3" />
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
-          </CardContent>
-        </Card>
+        <Card><CardContent className="p-6 space-y-4">
+          {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+        </CardContent></Card>
       </div>
     )
   }
@@ -112,22 +85,19 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ id: st
         <h2 className="text-xl font-bold mb-2">مش قادر أحمل الكورس</h2>
         <p className="text-muted-foreground mb-6">{error || "الكورس مش موجود"}</p>
         <Button asChild variant="outline">
-          <Link href="/dashboard/courses">
-            <ArrowRight className="w-4 h-4 ml-2" />
-            العودة للكورسات
-          </Link>
+          <Link href="/dashboard/courses"><ArrowRight className="w-4 h-4 ml-2" />العودة للكورسات</Link>
         </Button>
       </div>
     )
   }
 
+  const courseExams = exams.filter(e => !e.lecture_id)
+
   return (
     <div className="space-y-6">
+
       {/* زر الرجوع */}
-      <Link
-        href="/dashboard/courses"
-        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-      >
+      <Link href="/dashboard/courses" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
         <ArrowRight className="w-4 h-4" />
         <span>العودة للكورسات</span>
       </Link>
@@ -136,12 +106,7 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ id: st
       <Card className="overflow-hidden">
         <div className="relative aspect-3/1 bg-muted">
           {course.thumbnail ? (
-            <Image
-              src={course.thumbnail}
-              alt={course.title}
-              fill
-              className="object-cover"
-            />
+            <img src={getImageUrl(course.thumbnail) || ""} alt={course.title} className="absolute inset-0 w-full h-full object-cover" />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <BookOpen className="w-16 h-16 text-muted-foreground" />
@@ -151,29 +116,71 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ id: st
           <div className="absolute bottom-0 right-0 left-0 p-6 text-white">
             <h1 className="text-2xl md:text-3xl font-extrabold mb-2">{course.title}</h1>
             {course.description && (
-              <p className="text-white/80 text-sm md:text-base max-w-2xl line-clamp-2">
-                {course.description}
-              </p>
+              <p className="text-white/80 text-sm md:text-base max-w-2xl line-clamp-2">{course.description}</p>
             )}
           </div>
         </div>
-
         <CardContent className="p-4 md:p-6">
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <PlayCircle className="w-4 h-4" />
-              {totalLectures} محاضرة
-            </span>
-            <span className="flex items-center gap-1">
-              <Clock className="w-4 h-4" />
-              {gradeLabels[course.grade] || course.grade}
-            </span>
-            {!course.is_enrolled && (
-              <span className="text-destructive font-medium">غير مشترك</span>
-            )}
+            <span className="flex items-center gap-1"><PlayCircle className="w-4 h-4" />{totalLectures} محاضرة</span>
+            <span className="flex items-center gap-1"><Clock className="w-4 h-4" />{gradeLabels[course.grade] || course.grade}</span>
+            {!course.is_enrolled && <span className="text-destructive font-medium">غير مشترك</span>}
           </div>
         </CardContent>
       </Card>
+
+      {/* شريط التقدم */}
+      {progress && progress.total_lectures > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-foreground">تقدمك في الكورس</span>
+              <span className="text-sm font-bold text-primary">{progress.percentage}%</span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-primary h-3 rounded-full transition-all duration-500"
+                style={{ width: `${progress.percentage}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <PlayCircle className="w-3.5 h-3.5" />
+                {progress.watched} / {progress.total_lectures} محاضرة اتشافت
+              </span>
+              {progress.exam_stats.taken > 0 && (
+                <span className="flex items-center gap-1">
+                  <FileCheck className="w-3.5 h-3.5" />
+                  {progress.exam_stats.passed} / {progress.exam_stats.taken} اختبار اتجاز
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* اختبارات الكورس العامة */}
+      {courseExams.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileCheck className="w-4 h-4 text-chart-4" />اختبارات الكورس
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {courseExams.map(exam => (
+              <Link key={exam.id} href={`/dashboard/exam/${exam.id}`}
+                className="flex items-center justify-between p-3 bg-muted/50 hover:bg-muted rounded-xl transition-colors">
+                <span className="font-medium text-sm">{exam.title}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground">{exam.duration_minutes} دقيقة</span>
+                  <span className="text-xs font-bold text-chart-4">ابدأ</span>
+                </div>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* محتوى الكورس */}
       <Card>
@@ -187,55 +194,144 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ id: st
               <p className="text-muted-foreground">مفيش محاضرات متاحة دلوقتي</p>
             </div>
           ) : (
-            <Accordion
-              type="multiple"
-              defaultValue={course.units.map(u => `unit-${u.id}`)}
-              className="w-full"
-            >
+            // ====== Accordion المستوى الأول: الوحدات ======
+            <Accordion type="multiple" defaultValue={course.units.map(u => `unit-${u.id}`)} className="w-full">
               {course.units.map((unit, unitIdx) => (
                 <AccordionItem key={unit.id} value={`unit-${unit.id}`} className="border-b border-border">
+
+                  {/* هيدر الوحدة */}
                   <AccordionTrigger className="px-4 md:px-6 py-4 hover:bg-muted/50 hover:no-underline">
                     <div className="flex items-center gap-3 text-right">
                       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
                         {unitIdx + 1}
                       </div>
-                      <span className="font-bold">{unit.title}</span>
+                      <div>
+                        <span className="font-bold block">{unit.title}</span>
+                        <span className="text-xs text-muted-foreground">{unit.lectures.length} محاضرة</span>
+                      </div>
                     </div>
                   </AccordionTrigger>
+
                   <AccordionContent className="pb-0">
-                    <div className="divide-y divide-border">
-                      {unit.lectures.map((lecture) => {
-                        const rowClass = `flex items-center gap-4 px-4 md:px-6 py-4 hover:bg-muted/50 transition-colors ${!lecture.is_enrolled ? "opacity-50 cursor-not-allowed" : ""}`
-                        const inner = (
-                          <>
-                            <div className="shrink-0">{getLectureIcon(lecture)}</div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className={`font-medium ${!lecture.is_enrolled ? "text-muted-foreground" : "text-foreground"}`}>
-                                {lecture.title}
-                              </h4>
-                              {lecture.duration_minutes && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {lecture.duration_minutes} دقيقة
-                                </p>
-                              )}
-                            </div>
-                            {!lecture.is_enrolled && (
-                              <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
-                            )}
-                          </>
+                    {/* ====== Accordion المستوى الثاني: المحاضرات ====== */}
+                    <Accordion type="multiple" className="w-full">
+                      {unit.lectures.map((lecture, lecIdx) => {
+                        const lectureExam = exams.find(e => e.lecture_id === lecture.id)
+                        const isLocked = !lecture.is_enrolled
+
+                        return (
+                          <AccordionItem key={lecture.id} value={`lec-${lecture.id}`} className="border-t border-border/60">
+
+                            {/* هيدر المحاضرة */}
+                            <AccordionTrigger className={`px-6 md:px-8 py-3 hover:bg-muted/40 hover:no-underline ${isLocked ? "opacity-60" : ""}`}>
+                              <div className="flex items-center gap-3 text-right w-full pl-2">
+                                <div className="shrink-0">
+                                  {isLocked
+                                    ? <Lock className="w-4 h-4 text-muted-foreground" />
+                                    : lecture.video_url
+                                      ? <PlayCircle className="w-4 h-4 text-primary" />
+                                      : <FileText className="w-4 h-4 text-secondary" />}
+                                </div>
+                                <div className="flex-1 min-w-0 text-right">
+                                  <h4 className={`font-medium text-sm ${isLocked ? "text-muted-foreground" : "text-foreground"}`}>
+                                    {lecIdx + 1}. {lecture.title}
+                                  </h4>
+                                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                    {lecture.duration_minutes && (
+                                      <span className="text-xs text-muted-foreground">{lecture.duration_minutes} دقيقة</span>
+                                    )}
+                                    {lecture.lecture_type === "free" && (
+                                      <span className="text-xs text-chart-3 font-bold">مجاني</span>
+                                    )}
+                                    {lecture.pdf_url && !isLocked && (
+                                      <span className="text-xs text-secondary">+ PDF</span>
+                                    )}
+                                    {lectureExam && !isLocked && (
+                                      <span className="text-xs text-chart-4 font-bold">+ اختبار</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </AccordionTrigger>
+
+                            {/* محتوى المحاضرة */}
+                            <AccordionContent className="pb-0">
+                              <div className="px-8 md:px-10 py-4 bg-muted/20 space-y-3 border-t border-border/40">
+
+                                {isLocked ? (
+                                  <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+                                    <Lock className="w-4 h-4 shrink-0" />
+                                    <span>فعّل اشتراكك عشان تقدر تشوف المحاضرة دي</span>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {/* وصف المحاضرة */}
+                                    {lecture.description && (
+                                      <p className="text-sm text-muted-foreground">{lecture.description}</p>
+                                    )}
+
+                                    {/* الفيديو */}
+                                    {lecture.video_url && (
+                                      <Link
+                                        href={`/dashboard/watch/${lecture.id}`}
+                                        className="flex items-center gap-3 p-3 bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-xl transition-colors"
+                                      >
+                                        <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                                          <PlayCircle className="w-5 h-5 text-primary-foreground" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-bold text-sm text-primary">شاهد المحاضرة</p>
+                                          {lecture.duration_minutes && (
+                                            <p className="text-xs text-muted-foreground">{lecture.duration_minutes} دقيقة</p>
+                                          )}
+                                        </div>
+                                        <ExternalLink className="w-4 h-4 text-primary shrink-0" />
+                                      </Link>
+                                    )}
+
+                                    {/* PDF */}
+                                    {lecture.pdf_url && (
+                                      <a
+                                        href={lecture.pdf_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-3 p-3 bg-secondary/5 hover:bg-secondary/10 border border-secondary/20 rounded-xl transition-colors"
+                                      >
+                                        <div className="w-9 h-9 rounded-lg bg-secondary/20 flex items-center justify-center shrink-0">
+                                          <FileText className="w-5 h-5 text-secondary" />
+                                        </div>
+                                        <div className="flex-1">
+                                          <p className="font-bold text-sm text-foreground">ملف الشرح PDF</p>
+                                          <p className="text-xs text-muted-foreground">اضغط للتحميل أو العرض</p>
+                                        </div>
+                                        <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0" />
+                                      </a>
+                                    )}
+
+                                    {/* الاختبار */}
+                                    {lectureExam && (
+                                      <Link
+                                        href={`/dashboard/exam/${lectureExam.id}`}
+                                        className="flex items-center gap-3 p-3 bg-chart-4/5 hover:bg-chart-4/10 border border-chart-4/20 rounded-xl transition-colors"
+                                      >
+                                        <div className="w-9 h-9 rounded-lg bg-chart-4/20 flex items-center justify-center shrink-0">
+                                          <FileCheck className="w-5 h-5 text-chart-4" />
+                                        </div>
+                                        <div className="flex-1">
+                                          <p className="font-bold text-sm text-foreground">{lectureExam.title}</p>
+                                          <p className="text-xs text-muted-foreground">{lectureExam.duration_minutes} دقيقة</p>
+                                        </div>
+                                        <span className="text-xs font-bold text-chart-4 bg-chart-4/10 px-2 py-1 rounded-lg shrink-0">ابدأ</span>
+                                      </Link>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
                         )
-                        if (!lecture.is_enrolled) {
-                          return <div key={lecture.id} className={rowClass}>{inner}</div>
-                        }
-                        if (lecture.video_url) {
-                          return <Link key={lecture.id} href={`/dashboard/watch/${lecture.id}`} className={rowClass}>{inner}</Link>
-                        }
-                        if (lecture.pdf_url) {
-                          return <a key={lecture.id} href={lecture.pdf_url} target="_blank" rel="noopener noreferrer" className={rowClass}>{inner}</a>
-                        }
-                        return <div key={lecture.id} className={rowClass}>{inner}</div>
                       })}
-                    </div>
+                    </Accordion>
                   </AccordionContent>
                 </AccordionItem>
               ))}

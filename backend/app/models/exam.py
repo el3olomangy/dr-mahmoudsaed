@@ -3,6 +3,12 @@ from datetime import datetime, timezone
 
 
 def exam_doc(data, questions_docs: list) -> dict:
+    scheduled_at = None
+    if getattr(data, "scheduled_at", None):
+        try:
+            scheduled_at = datetime.fromisoformat(data.scheduled_at.replace("Z", "+00:00"))
+        except Exception:
+            scheduled_at = None
     return {
         "title": data.title,
         "lecture_id": data.lecture_id,
@@ -10,6 +16,7 @@ def exam_doc(data, questions_docs: list) -> dict:
         "duration_minutes": data.duration_minutes,
         "pass_score": data.pass_score,
         "show_result_immediately": data.show_result_immediately,
+        "scheduled_at": scheduled_at,
         "questions": questions_docs,
         "is_published": True,
         "created_at": datetime.now(timezone.utc),

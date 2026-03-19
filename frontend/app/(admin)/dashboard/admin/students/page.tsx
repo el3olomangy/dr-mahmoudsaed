@@ -16,8 +16,11 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
+  BookOpen,
+  PlayCircle,
+  FileCheck,
 } from "lucide-react";
-import { usersAPI } from "@/lib/api";
+import { usersAPI, progressAPI, coursesAPI } from "@/lib/api";
 
 interface Student {
   id: string;
@@ -43,9 +46,23 @@ export default function StudentsPage() {
   const [search, setSearch] = useState("");
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [courseNames, setCourseNames] = useState<Record<string, string>>({});
+  const [studentProgress, setStudentProgress] = useState<Record<string, any>>(
+    {},
+  );
 
   useEffect(() => {
     fetchStudents();
+    coursesAPI
+      .getAll()
+      .then((data: any) => {
+        const names: Record<string, string> = {};
+        data.forEach((c: any) => {
+          names[c.id] = c.title;
+        });
+        setCourseNames(names);
+      })
+      .catch(() => {});
   }, []);
 
   const fetchStudents = async () => {
@@ -251,11 +268,32 @@ export default function StudentsPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() =>
-                          setExpandedId(
-                            expandedId === student.id ? null : student.id,
-                          )
-                        }
+                        onClick={() => {
+                          const newId =
+                            expandedId === student.id ? null : student.id;
+                          setExpandedId(newId);
+                          if (newId && student.enrolled_courses.length > 0) {
+                            student.enrolled_courses.forEach(
+                              (courseId: string) => {
+                                const key = `${student.id}_${courseId}`;
+                                if (!studentProgress[key]) {
+                                  progressAPI
+                                    .getStudentCourseProgress(
+                                      student.id,
+                                      courseId,
+                                    )
+                                    .then((p: any) =>
+                                      setStudentProgress((prev) => ({
+                                        ...prev,
+                                        [key]: p,
+                                      })),
+                                    )
+                                    .catch(() => {});
+                                }
+                              },
+                            );
+                          }
+                        }}
                       >
                         {expandedId === student.id ? (
                           <ChevronUp className="w-4 h-4" />
@@ -297,6 +335,58 @@ export default function StudentsPage() {
                           </p>
                         </div>
                       </div>
+                      {/* تقدم الطالب في الكورسات */}
+                      {student.enrolled_courses.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          <p className="text-xs font-bold text-muted-foreground">
+                            تقدم الطالب
+                          </p>
+                          {student.enrolled_courses.map((courseId: string) => {
+                            const key = `${student.id}_${courseId}`;
+                            const p = studentProgress[key];
+                            const courseName =
+                              courseNames[courseId] || courseId;
+                            return (
+                              <div
+                                key={courseId}
+                                className="bg-background border border-border rounded-xl p-3"
+                              >
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <p className="text-xs font-medium text-foreground flex items-center gap-1 truncate max-w-[60%]">
+                                    <BookOpen className="w-3 h-3 shrink-0 text-muted-foreground" />
+                                    {courseName}
+                                  </p>
+                                  <span className="text-xs font-bold text-primary">
+                                    {p ? `${p.percentage}%` : "—"}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                                  <div
+                                    className="bg-primary h-2 rounded-full transition-all duration-500"
+                                    style={{
+                                      width: p ? `${p.percentage}%` : "0%",
+                                    }}
+                                  />
+                                </div>
+                                {p && (
+                                  <div className="flex items-center justify-between mt-1.5 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <PlayCircle className="w-3 h-3" />
+                                      {p.watched}/{p.total_lectures} محاضرة
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <FileCheck className="w-3 h-3" />
+                                      {p.exam_stats?.passed}/
+                                      {p.exam_stats?.taken} اختبار
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
                       <div className="mt-4">
                         <Button
                           size="sm"

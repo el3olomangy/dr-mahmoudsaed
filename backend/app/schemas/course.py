@@ -26,6 +26,15 @@ class LectureCreate(BaseModel):
     lecture_type: LectureType = LectureType.paid
     duration_minutes: Optional[int] = None
 
+class LectureUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    video_url: Optional[str] = None
+    pdf_url: Optional[str] = None
+    order: Optional[int] = None
+    lecture_type: Optional[LectureType] = None
+    duration_minutes: Optional[int] = None
+
 class LectureResponse(BaseModel):
     id: str
     title: str

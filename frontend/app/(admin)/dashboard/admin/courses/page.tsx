@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,9 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { BookOpen, Plus, RefreshCw, PlayCircle } from "lucide-react"
+import { BookOpen, Plus, RefreshCw, PlayCircle, Upload, X } from "lucide-react"
 import Link from "next/link"
-import { coursesAPI } from "@/lib/api"
+import { coursesAPI, uploadAPI } from "@/lib/api"
+import { getImageUrl } from "@/lib/utils/image"
 
 interface Course {
   id: string
@@ -52,6 +53,8 @@ export default function AdminCoursesPage() {
   const [form, setForm] = useState({
     title: "", description: "", grade: "", price: "", thumbnail: "",
   })
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { fetchCourses() }, [])
 
@@ -65,6 +68,21 @@ export default function AdminCoursesPage() {
       setError(err.message || "حصل خطأ")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploading(true)
+    try {
+      const url = await uploadAPI.image(file)
+      setForm(p => ({ ...p, thumbnail: url }))
+    } catch (err: any) {
+      setFormError(err.message || "فشل رفع الصورة")
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
     }
   }
 
@@ -159,14 +177,62 @@ export default function AdminCoursesPage() {
                       min="0"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>رابط الصورة</Label>
-                    <Input
-                      placeholder="https://..."
-                      value={form.thumbnail}
-                      onChange={e => setForm(p => ({ ...p, thumbnail: e.target.value }))}
-                      dir="ltr"
-                    />
+                  <div className="space-y-2 col-span-2">
+                    <Label>صورة الكورس</Label>
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      setIsUploading(true)
+                      try {
+                        const url = await uploadAPI.image(file)
+                        setForm(p => ({ ...p, thumbnail: url }))
+                      } catch (err: any) {
+                        setFormError(err.message || "فشل رفع الصورة")
+                      } finally {
+                        setIsUploading(false)
+                        if (fileInputRef.current) fileInputRef.current.value = ""
+                      }
+                    }} />
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="https://... أو ارفع من جهازك"
+                        value={form.thumbnail}
+                        onChange={e => setForm(p => ({ ...p, thumbnail: e.target.value }))}
+                        dir="ltr"
+                        className="flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium disabled:opacity-50"
+                      >
+                        <Upload className="w-4 h-4" />
+                        {isUploading ? "جاري الرفع..." : "رفع"}
+                      </button>
+                      {form.thumbnail && (
+                        <button
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, thumbnail: "" }))}
+                          className="shrink-0 p-2 rounded-lg border border-border hover:bg-destructive/10 transition-colors"
+                        >
+                          <X className="w-4 h-4 text-destructive" />
+                        </button>
+                      )}
+                    </div>
+                    {form.thumbnail && (
+                      <div className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted">
+                        <img
+                          src={getImageUrl(form.thumbnail) || form.thumbnail}
+                          alt="preview"
+                          className="w-full h-full object-cover"
+                          onError={e => { (e.target as HTMLImageElement).style.display = "none" }}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground -z-10">
+                          preview الصورة
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -225,7 +291,7 @@ export default function AdminCoursesPage() {
             <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
               <div className="relative aspect-video bg-muted flex items-center justify-center">
                 {course.thumbnail ? (
-                  <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                  <img src={getImageUrl(course.thumbnail) || ""} alt={course.title} className="w-full h-full object-cover" />
                 ) : (
                   <BookOpen className="w-10 h-10 text-muted-foreground" />
                 )}

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { BookOpen, PlayCircle, FileCheck, ArrowLeft, KeyRound } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { coursesAPI } from "@/lib/api"
+import { getImageUrl } from "@/lib/utils/image"
 
 interface Course {
   id: string
@@ -19,7 +20,7 @@ interface Course {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -27,6 +28,12 @@ export default function DashboardPage() {
     const fetchCourses = async () => {
       try {
         const data = await coursesAPI.getAll() as Course[]
+        // فلتر الكورسات المشترك فيها بالموجودة فعلاً فقط
+        const existingIds = new Set(data.map((c: Course) => c.id))
+        const validEnrolled = (user?.enrolled_courses || []).filter(id => existingIds.has(id))
+        if (validEnrolled.length !== (user?.enrolled_courses || []).length) {
+          updateUser({ enrolled_courses: validEnrolled })
+        }
         setCourses(data.slice(0, 3))
       } catch (err) {
         console.error(err)
@@ -62,7 +69,7 @@ export default function DashboardPage() {
                   اشتراكاتك
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="border-white text-white hover:bg-white/10">
+              <Button asChild className="bg-white text-primary hover:bg-white/90 font-bold">
                 <Link href="/dashboard/activate">
                   <KeyRound className="w-4 h-4 ml-2" />
                   فعّل كود
@@ -139,7 +146,7 @@ export default function DashboardPage() {
                 <div key={course.id} className="group bg-muted/50 rounded-xl overflow-hidden border border-border hover:border-primary/30 transition-colors">
                   <div className="relative aspect-video bg-muted">
                     {course.thumbnail ? (
-                      <Image src={course.thumbnail} alt={course.title} fill className="object-cover" />
+                      <img src={getImageUrl(course.thumbnail) || ""} alt={course.title} className="absolute inset-0 w-full h-full object-cover" />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <BookOpen className="w-10 h-10 text-muted-foreground" />
@@ -159,7 +166,7 @@ export default function DashboardPage() {
                         <Link href={`/dashboard/courses/${course.id}`}>الدخول على الكورس</Link>
                       </Button>
                     ) : (
-                      <Button asChild variant="outline" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
+                      <Button asChild className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/30 hover:border-primary">
                         <Link href="/dashboard/activate">
                           <KeyRound className="w-4 h-4 ml-2" />
                           ادخل كود الاشتراك

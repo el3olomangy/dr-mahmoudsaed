@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { KeyRound, PlayCircle, BookOpen, RefreshCw } from "lucide-react"
 import { coursesAPI } from "@/lib/api"
+import { getImageUrl } from "@/lib/utils/image"
 
 interface Course {
   id: string
@@ -24,7 +25,7 @@ function CourseCard({ course }: { course: Course }) {
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <div className="relative aspect-video bg-muted">
         {course.thumbnail ? (
-          <Image src={course.thumbnail} alt={course.title} fill className="object-cover" />
+          <img src={getImageUrl(course.thumbnail) || ""} alt={course.title} className="absolute inset-0 w-full h-full object-cover" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <BookOpen className="w-10 h-10 text-muted-foreground" />

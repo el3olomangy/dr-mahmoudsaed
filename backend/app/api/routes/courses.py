@@ -5,7 +5,7 @@ from ...core.database import get_db
 from ...core.dependencies import get_current_user, get_current_teacher
 from ...schemas.course import (
     CourseCreate, CourseResponse, CourseListItem,
-    UnitCreate, UnitResponse, LectureCreate, LectureResponse
+    UnitCreate, UnitResponse, LectureCreate, LectureUpdate, LectureResponse
 )
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
@@ -150,3 +150,51 @@ async def create_lecture(course_id: str, unit_id: str, data: LectureCreate, curr
         lecture_type=data.lecture_type,
         duration_minutes=data.duration_minutes,
     )
+
+# ====== تعديل وحذف المحاضرة ======
+
+@router.delete("/{course_id}/units/{unit_id}/lectures/{lecture_id}")
+async def delete_lecture(course_id: str, unit_id: str, lecture_id: str, current_user=Depends(get_current_teacher), db=Depends(get_db)):
+    lec = await db.lectures.find_one({"_id": ObjectId(lecture_id)})
+    if not lec:
+        raise HTTPException(status_code=404, detail="المحاضرة مش موجودة")
+    await db.lectures.delete_one({"_id": ObjectId(lecture_id)})
+    await db.courses.update_one({"_id": ObjectId(course_id)}, {"$inc": {"lectures_count": -1}})
+    return {"message": "تم حذف المحاضرة"}
+
+
+@router.patch("/{course_id}/units/{unit_id}/lectures/{lecture_id}")
+async def update_lecture(course_id: str, unit_id: str, lecture_id: str, data: LectureUpdate, current_user=Depends(get_current_teacher), db=Depends(get_db)):
+    lec = await db.lectures.find_one({"_id": ObjectId(lecture_id)})
+    if not lec:
+        raise HTTPException(status_code=404, detail="المحاضرة مش موجودة")
+    # نحدث كل الحقول اللي اتبعتت (حتى لو None عشان نقدر نمسح القيمة)
+    update_data = {k: v for k, v in data.model_dump(exclude_unset=False).items() if v is not None}
+    await db.lectures.update_one({"_id": ObjectId(lecture_id)}, {"$set": update_data})
+    updated = await db.lectures.find_one({"_id": ObjectId(lecture_id)})
+    return LectureResponse(
+        id=str(updated["_id"]),
+        title=updated["title"],
+        description=updated.get("description"),
+        video_url=updated.get("video_url"),
+        pdf_url=updated.get("pdf_url"),
+        order=updated["order"],
+        lecture_type=updated["lecture_type"],
+        duration_minutes=updated.get("duration_minutes"),
+    )
+
+
+# ====== حذف الوحدة ======
+
+@router.delete("/{course_id}/units/{unit_id}")
+async def delete_unit(course_id: str, unit_id: str, current_user=Depends(get_current_teacher), db=Depends(get_db)):
+    unit = await db.units.find_one({"_id": ObjectId(unit_id)})
+    if not unit:
+        raise HTTPException(status_code=404, detail="الوحدة مش موجودة")
+    # احسب عدد المحاضرات اللي هتتحذف
+    lec_count = await db.lectures.count_documents({"unit_id": unit_id})
+    await db.lectures.delete_many({"unit_id": unit_id})
+    await db.units.delete_one({"_id": ObjectId(unit_id)})
+    if lec_count > 0:
+        await db.courses.update_one({"_id": ObjectId(course_id)}, {"$inc": {"lectures_count": -lec_count}})
+    return {"message": "تم حذف الوحدة ومحاضراتها"}

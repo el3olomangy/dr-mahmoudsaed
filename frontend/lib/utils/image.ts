@@ -36,3 +36,27 @@ export function getGoogleDriveImageUrl(url: string): string {
 export function isGoogleDriveUrl(url: string): boolean {
   return url?.includes("drive.google.com") ?? false
 }
+
+/**
+ * يحول أي رابط صورة لرابط يشتغل في <img>
+ * - Google Drive: /file/d/ID/view → direct download URL
+ * - روابط عادية: تفضل كما هي
+ */
+export function getImageUrl(url: string | null | undefined): string | null {
+  if (!url || !url.trim()) return null
+
+  // Google Drive: /file/d/FILE_ID/view أو /file/d/FILE_ID/edit
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (driveMatch) {
+    return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`
+  }
+
+  // Google Drive open link: ?id=FILE_ID
+  const driveOpenMatch = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/)
+  if (driveOpenMatch) {
+    return `https://drive.google.com/thumbnail?id=${driveOpenMatch[1]}&sz=w800`
+  }
+
+  // رابط عادي — رجّعه كما هو
+  return url
+}

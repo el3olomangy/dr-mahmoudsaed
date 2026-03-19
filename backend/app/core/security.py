@@ -2,6 +2,7 @@ import bcrypt
 from jose import jwt
 from datetime import datetime, timedelta, timezone
 from .config import settings
+from .database import get_db
 
 
 def get_password_hash(password: str) -> str:
@@ -46,3 +47,28 @@ def decode_token(token: str, token_type: str = "access"):
         return payload
     except Exception:
         return None
+
+
+async def blacklist_token(token: str) -> None:
+    """يضيف التوكن في الـ blacklist مع تاريخ انتهائه"""
+    payload = decode_token(token, token_type="refresh")
+    expires_at = None
+    if payload and payload.get("exp"):
+        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    else:
+        # لو التوكن مش صالح خليه يتمسح بعد يوم
+        expires_at = datetime.now(timezone.utc) + timedelta(days=1)
+
+    db = get_db()
+    await db.token_blacklist.update_one(
+        {"token": token},
+        {"$set": {"token": token, "expires_at": expires_at}},
+        upsert=True,
+    )
+
+
+async def is_token_blacklisted(token: str) -> bool:
+    """يتحقق إن التوكن اتحط في الـ blacklist"""
+    db = get_db()
+    doc = await db.token_blacklist.find_one({"token": token})
+    return doc is not None

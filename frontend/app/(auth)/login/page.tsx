@@ -48,8 +48,8 @@ export default function LoginPage() {
         device_id: getDeviceId(),
       })
 
-      // سجّل الدخول في الـ AuthContext
-      login(data.access_token, data.user)
+      // سجّل الدخول في الـ AuthContext + احفظ الـ refresh token
+      login(data.access_token, data.user, data.refresh_token)
 
       // روح للصفحة المناسبة بناءً على الـ role من الـ response مباشرة
       // نستخدم replace عشان منرجعش للـ login لو الـ user ضغط back

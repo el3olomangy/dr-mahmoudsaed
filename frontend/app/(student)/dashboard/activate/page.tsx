@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { KeyRound, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react"
-import { codesAPI } from "@/lib/api"
+import { codesAPI, usersAPI } from "@/lib/api"
 import { useAuth } from "@/context/AuthContext"
 import Link from "next/link"
 
@@ -30,12 +30,24 @@ export default function ActivateCodePage() {
 
       // حدّث الـ enrolled_courses في الـ AuthContext
       // الـ API بيرجع enrolled_courses كـ list من الـ IDs الجديدة
-      if (data.enrolled_courses?.length && user) {
-        const updatedCourses = [
-          ...(user.enrolled_courses || []),
-          ...data.enrolled_courses.filter((id: string) => !user.enrolled_courses?.includes(id))
-        ]
-        updateUser({ enrolled_courses: updatedCourses })
+      // حدّث enrolled_courses من الـ API مباشرة عشان تضمن التزامن
+      try {
+        const profile: any = await usersAPI.getMyProfile()
+        updateUser({
+          enrolled_courses: profile.enrolled_courses || [],
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          governorate: profile.governorate,
+        })
+      } catch {
+        // fallback للطريقة القديمة
+        if (data.enrolled_courses?.length && user) {
+          const updatedCourses = [
+            ...(user.enrolled_courses || []),
+            ...data.enrolled_courses.filter((id: string) => !user.enrolled_courses?.includes(id))
+          ]
+          updateUser({ enrolled_courses: updatedCourses })
+        }
       }
 
       setStatus("success")
@@ -101,13 +113,19 @@ export default function ActivateCodePage() {
               </div>
             )}
 
-            <Button
+            <button
               type="submit"
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6"
-              disabled={isLoading || !code.trim()}
+              disabled={isLoading}
+              className={`w-full font-bold py-4 rounded-xl text-base transition-colors ${
+                !code.trim()
+                  ? "bg-primary/50 text-white cursor-not-allowed"
+                  : isLoading
+                  ? "bg-primary/80 text-white cursor-wait"
+                  : "bg-primary hover:bg-primary/90 text-white"
+              }`}
             >
               {isLoading ? "جاري التفعيل..." : "تفعيل الكود"}
-            </Button>
+            </button>
 
             {status === "success" && (
               <Button

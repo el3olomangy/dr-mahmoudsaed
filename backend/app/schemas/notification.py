@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 from enum import Enum
 from datetime import datetime
 
@@ -8,6 +8,7 @@ class NotificationType(str, Enum):
     new_lecture = "new_lecture"
     new_exam = "new_exam"
     exam_result = "exam_result"
+    exam_reviewed = "exam_reviewed"
     code_activated = "code_activated"
     subscription_expiry = "subscription_expiry"
 
@@ -22,6 +23,6 @@ class NotificationResponse(BaseModel):
     id: str
     title: str
     body: str
-    notification_type: NotificationType
+    notification_type: str  # str بدل enum عشان يقبل أي قيمة جديدة من غير ما يكسر
     is_read: bool = False
     created_at: datetime
