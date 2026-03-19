@@ -14,7 +14,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { coursesAPI, examsAPI, progressAPI } from "@/lib/api"
-import { getEmbedUrl, detectVideoType } from "@/lib/utils/video"
+import VideoPlayer from "@/components/VideoPlayer"
 import { useAuth } from "@/context/AuthContext"
 
 interface Lecture {
@@ -55,17 +55,6 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
   const [exam, setExam] = useState<ExamInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
-  const [watermarkPosition, setWatermarkPosition] = useState({ x: 50, y: 50 })
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setWatermarkPosition({
-        x: Math.random() * 60 + 20,
-        y: Math.random() * 60 + 20,
-      })
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [])
 
   useEffect(() => {
     const fetchLecture = async () => {
@@ -170,45 +159,10 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
       </Link>
 
       <Card className="overflow-hidden">
-        <div className="relative aspect-video bg-black">
-          {lecture.video_url ? (() => {
-            const embedUrl = getEmbedUrl(lecture.video_url)
-            const videoType = detectVideoType(lecture.video_url)
-            return (
-              <>
-                <iframe
-                  key={embedUrl}
-                  src={embedUrl}
-                  className="absolute inset-0 w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                  sandbox={videoType === "drive"
-                    ? "allow-scripts allow-same-origin allow-forms allow-popups"
-                    : "allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-                  }
-                />
-                {studentWatermark && (
-                  <div
-                    className="absolute text-white/40 text-sm font-bold pointer-events-none select-none transition-all duration-1000 z-10"
-                    style={{
-                      left: `${watermarkPosition.x}%`,
-                      top: `${watermarkPosition.y}%`,
-                      transform: "translate(-50%, -50%)",
-                      textShadow: "1px 1px 2px rgba(0,0,0,0.8)",
-                    }}
-                  >
-                    {studentWatermark}
-                  </div>
-                )}
-              </>
-            )
-          })() : (
-            <div className="absolute inset-0 flex items-center justify-center text-white/60">
-              <p>الفيديو مش متاح</p>
-            </div>
-          )}
-        </div>
+        <VideoPlayer
+          url={lecture.video_url || ""}
+          watermark={studentWatermark}
+        />
 
         <CardContent className="p-4 md:p-6">
           <div className="mb-4">
