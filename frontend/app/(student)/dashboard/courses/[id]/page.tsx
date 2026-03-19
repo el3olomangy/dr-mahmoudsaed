@@ -1,207 +1,246 @@
+"use client"
+
+import { useEffect, useState, use } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { 
-  PlayCircle, 
-  FileText, 
-  FileCheck, 
-  ClipboardList, 
-  Lock, 
-  CheckCircle,
+import {
+  PlayCircle,
+  FileText,
+  Lock,
+  ArrowRight,
+  AlertCircle,
+  BookOpen,
   Clock,
-  ArrowRight
 } from "lucide-react"
+import { coursesAPI } from "@/lib/api"
 
-// Mock course data
-const courseData = {
-  id: 1,
-  title: "الكيمياء العضوية",
-  description: "شرح شامل ومفصل للكيمياء العضوية للصف الثالث الثانوي. الكورس يغطي جميع فصول المنهج مع تمارين وأسئلة امتحانات سابقة.",
-  thumbnail: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&h=400&fit=crop",
-  instructor: "د. محمود سعيد",
-  lastUpdated: "مارس 2026",
-  totalLectures: 24,
-  totalDuration: "12 ساعة",
-  isSubscribed: true,
-  units: [
-    {
-      id: 1,
-      title: "الوحدة الأولى: مقدمة في الكيمياء العضوية",
-      lectures: [
-        { id: 1, title: "مقدمة وأساسيات", type: "video", duration: "45 دقيقة", isCompleted: true, isLocked: false },
-        { id: 2, title: "تصنيف المركبات العضوية", type: "video", duration: "38 دقيقة", isCompleted: true, isLocked: false },
-        { id: 3, title: "ملف شرح الوحدة الأولى", type: "pdf", isCompleted: true, isLocked: false },
-        { id: 4, title: "اختبار الوحدة الأولى", type: "exam", questions: 15, isCompleted: true, isLocked: false },
-      ],
-    },
-    {
-      id: 2,
-      title: "الوحدة الثانية: الهيدروكربونات",
-      lectures: [
-        { id: 5, title: "الألكانات", type: "video", duration: "52 دقيقة", isCompleted: true, isLocked: false },
-        { id: 6, title: "الألكينات والألكاينات", type: "video", duration: "48 دقيقة", isCompleted: false, isLocked: false },
-        { id: 7, title: "ملف شرح الهيدروكربونات", type: "pdf", isCompleted: false, isLocked: false },
-        { id: 8, title: "شيت تدريبات الهيدروكربونات", type: "assignment", isCompleted: false, isLocked: false },
-        { id: 9, title: "اختبار الوحدة الثانية", type: "exam", questions: 20, isCompleted: false, isLocked: false },
-      ],
-    },
-    {
-      id: 3,
-      title: "الوحدة الثالثة: الألدهيدات والكيتونات",
-      lectures: [
-        { id: 10, title: "مقدمة في الألدهيدات", type: "video", duration: "40 دقيقة", isCompleted: false, isLocked: false },
-        { id: 11, title: "الكيتونات وخواصها", type: "video", duration: "45 دقيقة", isCompleted: false, isLocked: false },
-        { id: 12, title: "ملف شرح الوحدة الثالثة", type: "pdf", isCompleted: false, isLocked: true },
-        { id: 13, title: "اختبار الوحدة الثالثة", type: "exam", questions: 18, isCompleted: false, isLocked: true },
-      ],
-    },
-  ],
+interface Lecture {
+  id: string
+  title: string
+  description?: string
+  video_url?: string
+  pdf_url?: string
+  order: number
+  lecture_type: string
+  duration_minutes?: number
+  is_enrolled: boolean
 }
 
-function getLectureIcon(type: string, isCompleted: boolean, isLocked: boolean) {
-  if (isLocked) return <Lock className="w-5 h-5 text-muted-foreground" />
-  if (isCompleted) return <CheckCircle className="w-5 h-5 text-chart-3" />
-  
-  switch (type) {
-    case "video":
-      return <PlayCircle className="w-5 h-5 text-primary" />
-    case "pdf":
-      return <FileText className="w-5 h-5 text-secondary" />
-    case "exam":
-      return <FileCheck className="w-5 h-5 text-chart-4" />
-    case "assignment":
-      return <ClipboardList className="w-5 h-5 text-chart-3" />
-    default:
-      return <PlayCircle className="w-5 h-5" />
+interface Unit {
+  id: string
+  title: string
+  order: number
+  lectures: Lecture[]
+}
+
+interface Course {
+  id: string
+  title: string
+  description?: string
+  grade: string
+  price?: number
+  thumbnail?: string
+  units: Unit[]
+  is_enrolled: boolean
+}
+
+const gradeLabels: Record<string, string> = {
+  first_secondary: "الصف الأول الثانوي",
+  second_secondary: "الصف الثاني الثانوي",
+  third_secondary: "الصف الثالث الثانوي",
+}
+
+function getLectureIcon(lecture: Lecture) {
+  if (!lecture.is_enrolled) return <Lock className="w-5 h-5 text-muted-foreground" />
+  if (lecture.pdf_url && !lecture.video_url) return <FileText className="w-5 h-5 text-secondary" />
+  return <PlayCircle className="w-5 h-5 text-primary" />
+}
+
+export default function CourseDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: courseId } = use(params)
+  const [course, setCourse] = useState<Course | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    const fetchCourse = async () => {
+      setIsLoading(true)
+      setError("")
+      try {
+        const data = await coursesAPI.getOne(courseId) as Course
+        setCourse(data)
+      } catch (err: any) {
+        setError(err.message || "حصل خطأ في تحميل الكورس")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchCourse()
+  }, [courseId])
+
+  const totalLectures = course?.units.flatMap(u => u.lectures).length || 0
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-5 w-32" />
+        <Card className="overflow-hidden">
+          <Skeleton className="aspect-3/1 w-full" />
+          <CardContent className="p-6 space-y-3">
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
-}
 
-function getLectureHref(lectureId: number, type: string) {
-  switch (type) {
-    case "video":
-      return `/dashboard/watch/${lectureId}`
-    case "pdf":
-      return `/dashboard/pdf/${lectureId}`
-    case "exam":
-      return `/dashboard/exam/${lectureId}`
-    case "assignment":
-      return `/dashboard/assignment/${lectureId}`
-    default:
-      return "#"
+  if (error || !course) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-16">
+        <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+        <h2 className="text-xl font-bold mb-2">مش قادر أحمل الكورس</h2>
+        <p className="text-muted-foreground mb-6">{error || "الكورس مش موجود"}</p>
+        <Button asChild variant="outline">
+          <Link href="/dashboard/courses">
+            <ArrowRight className="w-4 h-4 ml-2" />
+            العودة للكورسات
+          </Link>
+        </Button>
+      </div>
+    )
   }
-}
-
-export default function CourseDetailsPage() {
-  const completedLectures = courseData.units.flatMap(u => u.lectures).filter(l => l.isCompleted).length
-  const totalLectures = courseData.units.flatMap(u => u.lectures).length
-  const progress = Math.round((completedLectures / totalLectures) * 100)
 
   return (
     <div className="space-y-6">
-      {/* Back Button */}
-      <Link 
-        href="/dashboard/courses" 
+      {/* زر الرجوع */}
+      <Link
+        href="/dashboard/courses"
         className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowRight className="w-4 h-4" />
         <span>العودة للكورسات</span>
       </Link>
 
-      {/* Course Header */}
+      {/* هيدر الكورس */}
       <Card className="overflow-hidden">
-        <div className="relative aspect-[3/1]">
-          <Image 
-            src={courseData.thumbnail}
-            alt={courseData.title}
-            fill
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+        <div className="relative aspect-3/1 bg-muted">
+          {course.thumbnail ? (
+            <Image
+              src={course.thumbnail}
+              alt={course.title}
+              fill
+              className="object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <BookOpen className="w-16 h-16 text-muted-foreground" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-linear-to-t from-black/80 to-transparent" />
           <div className="absolute bottom-0 right-0 left-0 p-6 text-white">
-            <h1 className="text-2xl md:text-3xl font-extrabold mb-2">{courseData.title}</h1>
-            <p className="text-white/80 text-sm md:text-base max-w-2xl">{courseData.description}</p>
+            <h1 className="text-2xl md:text-3xl font-extrabold mb-2">{course.title}</h1>
+            {course.description && (
+              <p className="text-white/80 text-sm md:text-base max-w-2xl line-clamp-2">
+                {course.description}
+              </p>
+            )}
           </div>
         </div>
+
         <CardContent className="p-4 md:p-6">
-          <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm text-muted-foreground mb-4">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <PlayCircle className="w-4 h-4" />
-              {courseData.totalLectures} محاضرة
+              {totalLectures} محاضرة
             </span>
             <span className="flex items-center gap-1">
               <Clock className="w-4 h-4" />
-              {courseData.totalDuration}
+              {gradeLabels[course.grade] || course.grade}
             </span>
-            <span>آخر تحديث: {courseData.lastUpdated}</span>
-          </div>
-
-          {/* Progress */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-muted-foreground">
-                أكملت {completedLectures} من {totalLectures} محاضرة
-              </span>
-              <span className="font-bold text-primary">{progress}%</span>
-            </div>
-            <div className="h-3 bg-muted rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-primary rounded-full transition-all"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+            {!course.is_enrolled && (
+              <span className="text-destructive font-medium">غير مشترك</span>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Course Content */}
+      {/* محتوى الكورس */}
       <Card>
         <CardHeader>
           <CardTitle className="text-xl font-bold">محتوى الكورس</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <Accordion type="multiple" defaultValue={["unit-1", "unit-2"]} className="w-full">
-            {courseData.units.map((unit) => (
-              <AccordionItem key={unit.id} value={`unit-${unit.id}`} className="border-b border-border">
-                <AccordionTrigger className="px-4 md:px-6 py-4 hover:bg-muted/50 hover:no-underline">
-                  <div className="flex items-center gap-3 text-right">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                      {unit.id}
+          {course.units.length === 0 ? (
+            <div className="text-center py-12">
+              <BookOpen className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">مفيش محاضرات متاحة دلوقتي</p>
+            </div>
+          ) : (
+            <Accordion
+              type="multiple"
+              defaultValue={course.units.map(u => `unit-${u.id}`)}
+              className="w-full"
+            >
+              {course.units.map((unit, unitIdx) => (
+                <AccordionItem key={unit.id} value={`unit-${unit.id}`} className="border-b border-border">
+                  <AccordionTrigger className="px-4 md:px-6 py-4 hover:bg-muted/50 hover:no-underline">
+                    <div className="flex items-center gap-3 text-right">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                        {unitIdx + 1}
+                      </div>
+                      <span className="font-bold">{unit.title}</span>
                     </div>
-                    <span className="font-bold">{unit.title}</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pb-0">
-                  <div className="divide-y divide-border">
-                    {unit.lectures.map((lecture) => (
-                      <Link
-                        key={lecture.id}
-                        href={lecture.isLocked ? "#" : getLectureHref(lecture.id, lecture.type)}
-                        className={`flex items-center gap-4 px-4 md:px-6 py-4 hover:bg-muted/50 transition-colors ${lecture.isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <div className="flex-shrink-0">
-                          {getLectureIcon(lecture.type, lecture.isCompleted, lecture.isLocked)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className={`font-medium ${lecture.isCompleted ? 'text-muted-foreground' : 'text-foreground'}`}>
-                            {lecture.title}
-                          </h4>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                            {'duration' in lecture && <span>{lecture.duration}</span>}
-                            {'questions' in lecture && <span>{lecture.questions} سؤال</span>}
-                          </div>
-                        </div>
-                        {lecture.isCompleted && (
-                          <span className="text-xs text-chart-3 font-medium">مكتمل</span>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-0">
+                    <div className="divide-y divide-border">
+                      {unit.lectures.map((lecture) => {
+                        const rowClass = `flex items-center gap-4 px-4 md:px-6 py-4 hover:bg-muted/50 transition-colors ${!lecture.is_enrolled ? "opacity-50 cursor-not-allowed" : ""}`
+                        const inner = (
+                          <>
+                            <div className="shrink-0">{getLectureIcon(lecture)}</div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className={`font-medium ${!lecture.is_enrolled ? "text-muted-foreground" : "text-foreground"}`}>
+                                {lecture.title}
+                              </h4>
+                              {lecture.duration_minutes && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {lecture.duration_minutes} دقيقة
+                                </p>
+                              )}
+                            </div>
+                            {!lecture.is_enrolled && (
+                              <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+                            )}
+                          </>
+                        )
+                        if (!lecture.is_enrolled) {
+                          return <div key={lecture.id} className={rowClass}>{inner}</div>
+                        }
+                        if (lecture.video_url) {
+                          return <Link key={lecture.id} href={`/dashboard/watch/${lecture.id}`} className={rowClass}>{inner}</Link>
+                        }
+                        if (lecture.pdf_url) {
+                          return <a key={lecture.id} href={lecture.pdf_url} target="_blank" rel="noopener noreferrer" className={rowClass}>{inner}</a>
+                        }
+                        return <div key={lecture.id} className={rowClass}>{inner}</div>
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
         </CardContent>
       </Card>
     </div>

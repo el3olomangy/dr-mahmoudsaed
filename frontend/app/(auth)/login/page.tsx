@@ -48,16 +48,15 @@ export default function LoginPage() {
         device_id: getDeviceId(),
       })
 
-      // استخدم الـ AuthContext بدل localStorage مباشرة
+      // سجّل الدخول في الـ AuthContext
       login(data.access_token, data.user)
 
-      // بعد ما الـ login يتم، روح للصفحة المطلوبة أو الـ dashboard
+      // روح للصفحة المناسبة بناءً على الـ role من الـ response مباشرة
+      // نستخدم replace عشان منرجعش للـ login لو الـ user ضغط back
       const redirect = searchParams.get("redirect")
-      if (data.user.role === "teacher" || data.user.role === "assistant") {
-        router.push(redirect || "/dashboard/admin")
-      } else {
-        router.push(redirect || "/dashboard")
-      }
+      const isAdmin = data.user.role === "teacher" || data.user.role === "assistant"
+      const destination = redirect || (isAdmin ? "/dashboard/admin" : "/dashboard")
+      router.replace(destination)
     } catch (err: any) {
       setError(err.message || "حصل خطأ — حاول تاني")
     } finally {

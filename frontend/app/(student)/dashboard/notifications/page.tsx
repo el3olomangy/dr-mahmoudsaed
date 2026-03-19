@@ -10,8 +10,8 @@ import { notificationsAPI } from "@/lib/api"
 interface Notification {
   id: string
   title: string
-  message: string
-  type: string
+  body: string
+  notification_type: string
   is_read: boolean
   created_at: string
 }
@@ -141,7 +141,7 @@ export default function NotificationsPage() {
           ) : (
             <div className="divide-y divide-border">
               {notifications.map((n) => {
-                const config = typeConfig[n.type] || typeConfig.announcement
+                const config = typeConfig[n.notification_type] || typeConfig.announcement
                 const Icon = config.icon
                 return (
                   <div
@@ -163,7 +163,7 @@ export default function NotificationsPage() {
                           <span className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{n.message}</p>
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{n.body}</p>
                       <p className="text-xs text-muted-foreground mt-2">{timeAgo(n.created_at)}</p>
                     </div>
                   </div>

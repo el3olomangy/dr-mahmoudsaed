@@ -72,13 +72,23 @@ async def get_student_by_parent(parent_phone: str, db=Depends(get_db)):
     student = await db.users.find_one({"parent_phone": parent_phone, "role": "student"})
     if not student:
         raise HTTPException(status_code=404, detail="مفيش طالب مرتبط بالرقم ده")
+
+    enrolled_ids = student.get("enrolled_courses", [])
+    courses = []
+    if enrolled_ids:
+        course_docs = await db.courses.find(
+            {"_id": {"$in": [ObjectId(c) for c in enrolled_ids if ObjectId.is_valid(c)]}},
+            {"title": 1}
+        ).to_list(100)
+        courses = [{"id": str(c["_id"]), "title": c["title"]} for c in course_docs]
+
     return {
         "id": str(student["_id"]),
         "first_name": student["first_name"],
         "last_name": student["last_name"],
         "grade": student.get("grade"),
         "governorate": student.get("governorate"),
-        "enrolled_courses": student.get("enrolled_courses", []),
+        "enrolled_courses": courses,
     }
 
 

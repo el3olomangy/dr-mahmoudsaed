@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { BookOpen, Plus, RefreshCw, PlayCircle } from "lucide-react"
+import Link from "next/link"
 import { coursesAPI } from "@/lib/api"
 
 interface Course {
@@ -220,7 +221,8 @@ export default function AdminCoursesPage() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {courses.map(course => (
-            <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
+            <Link key={course.id} href={`/dashboard/admin/courses/${course.id}`}>
+            <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
               <div className="relative aspect-video bg-muted flex items-center justify-center">
                 {course.thumbnail ? (
                   <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
@@ -245,6 +247,7 @@ export default function AdminCoursesPage() {
                 )}
               </CardContent>
             </Card>
+            </Link>
           ))}
         </div>
       )}

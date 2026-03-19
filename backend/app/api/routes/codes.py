@@ -89,7 +89,7 @@ async def activate_code(data: CodeActivate, current_user=Depends(get_current_use
         raise HTTPException(status_code=400, detail="الكود اتستخدم قبل كده")
     if code["status"] == CodeStatus.disabled:
         raise HTTPException(status_code=400, detail="الكود متعطل")
-    if code.get("expires_at") and datetime.now(timezone.utc) > code["expires_at"]:
+    if code.get("expires_at") and datetime.now(timezone.utc) > code["expires_at"].replace(tzinfo=timezone.utc):
         raise HTTPException(status_code=400, detail="الكود منتهي الصلاحية")
 
     user_id = str(current_user["_id"])
@@ -116,6 +116,9 @@ async def activate_code(data: CodeActivate, current_user=Depends(get_current_use
         {"_id": code["_id"]},
         {"$set": {"status": CodeStatus.used, "used_by": user_id, "used_at": datetime.now(timezone.utc)}}
     )
+    # تأكد إن الكورسات strings مش ObjectIds
+    courses_to_enroll = [str(c) for c in courses_to_enroll]
+
     await db.users.update_one(
         {"_id": current_user["_id"]},
         {"$addToSet": {"enrolled_courses": {"$each": courses_to_enroll}}}
@@ -132,3 +135,53 @@ async def disable_code(code_id: str, current_user=Depends(get_current_teacher), 
         raise HTTPException(status_code=404, detail="الكود مش موجود")
     await db.codes.update_one({"_id": oid}, {"$set": {"status": CodeStatus.disabled}})
     return {"message": "تم تعطيل الكود"}
+
+
+@router.delete("/{code_id}")
+async def delete_code(code_id: str, current_user=Depends(get_current_teacher), db=Depends(get_db)):
+    oid = validate_object_id(code_id)
+    code = await db.codes.find_one({"_id": oid})
+    if not code:
+        raise HTTPException(status_code=404, detail="الكود مش موجود")
+    await db.codes.delete_one({"_id": oid})
+    return {"message": "تم حذف الكود"}
+
+
+@router.patch("/{code_id}/revoke/{user_id}")
+async def revoke_code_from_student(
+    code_id: str, user_id: str,
+    current_user=Depends(get_current_teacher), db=Depends(get_db)
+):
+    """
+    سحب الكود من طالب معين وإعادة تفعيله للاستخدام من جديد
+    """
+    oid = validate_object_id(code_id)
+    uid = validate_object_id(user_id)
+
+    code = await db.codes.find_one({"_id": oid})
+    if not code:
+        raise HTTPException(status_code=404, detail="الكود مش موجود")
+
+    if code.get("used_by") != str(user_id):
+        raise HTTPException(status_code=400, detail="الكود ده ماتمش مستخدمش من الطالب ده")
+
+    # الغي الاشتراك من الطالب
+    courses_to_remove = []
+    if code["code_type"] == CodeType.course and code.get("course_id"):
+        courses_to_remove = [code["course_id"]]
+    elif code["code_type"] == CodeType.bundle and code.get("bundle_ids"):
+        courses_to_remove = code["bundle_ids"]
+
+    if courses_to_remove:
+        await db.users.update_one(
+            {"_id": uid},
+            {"$pull": {"enrolled_courses": {"$in": courses_to_remove}}}
+        )
+
+    # أعد الكود لحالته الأصلية
+    await db.codes.update_one(
+        {"_id": oid},
+        {"$set": {"status": CodeStatus.active, "used_by": None, "used_at": None}}
+    )
+
+    return {"message": "تم سحب الكود من الطالب وإعادته للتفعيل"}

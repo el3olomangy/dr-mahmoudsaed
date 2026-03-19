@@ -1,46 +1,61 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { 
-  ArrowRight, 
-  ChevronLeft, 
-  ChevronRight, 
-  FileText, 
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
   FileCheck,
-  Play,
-  Pause,
-  Maximize,
-  Volume2
+  AlertCircle,
 } from "lucide-react"
+import { coursesAPI, examsAPI } from "@/lib/api"
+import { useAuth } from "@/context/AuthContext"
 
-// Mock lecture data
-const lectureData = {
-  id: 1,
-  title: "مقدمة وأساسيات الكيمياء العضوية",
-  courseId: 1,
-  courseName: "الكيمياء العضوية",
-  unitName: "الوحدة الأولى",
-  videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-  duration: "45:00",
-  hasAttachment: true,
-  attachmentName: "ملف شرح المحاضرة الأولى.pdf",
-  hasExam: true,
-  examId: 4,
-  prevLectureId: null,
-  nextLectureId: 2,
+interface Lecture {
+  id: string
+  title: string
+  description?: string
+  video_url?: string
+  pdf_url?: string
+  order: number
+  lecture_type: string
+  duration_minutes?: number
+  is_enrolled: boolean
 }
 
-// Mock student name for watermark
-const studentName = "محمد أحمد - 01012345678"
+interface Unit {
+  id: string
+  title: string
+  order: number
+  lectures: Lecture[]
+}
 
-export default function WatchPage() {
-  const [isPlaying, setIsPlaying] = useState(false)
+interface ExamInfo {
+  id: string
+  title: string
+  duration_minutes: number
+}
+
+export default function WatchPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: lectureId } = use(params)
+  const { user } = useAuth()
+
+  const [lecture, setLecture] = useState<Lecture | null>(null)
+  const [courseId, setCourseId] = useState<string | null>(null)
+  const [courseName, setCourseName] = useState<string>("")
+  const [unitName, setUnitName] = useState<string>("")
+  const [prevLectureId, setPrevLectureId] = useState<string | null>(null)
+  const [nextLectureId, setNextLectureId] = useState<string | null>(null)
+  const [exam, setExam] = useState<ExamInfo | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
   const [watermarkPosition, setWatermarkPosition] = useState({ x: 50, y: 50 })
 
-  // Moving watermark effect
   useEffect(() => {
     const interval = setInterval(() => {
       setWatermarkPosition({
@@ -51,80 +66,159 @@ export default function WatchPage() {
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    const fetchLecture = async () => {
+      setIsLoading(true)
+      setError("")
+      try {
+        const courses = await coursesAPI.getAll() as any[]
+
+        for (const course of courses) {
+          if (!course.is_enrolled) continue
+          const fullCourse = await coursesAPI.getOne(course.id) as any
+
+          let allLectures: Lecture[] = []
+          for (const unit of (fullCourse.units || [])) {
+            allLectures = [...allLectures, ...unit.lectures]
+          }
+
+          const foundLecture = allLectures.find((l: Lecture) => l.id === lectureId)
+          if (foundLecture) {
+            const foundUnit = fullCourse.units.find((u: Unit) =>
+              u.lectures.some((l: Lecture) => l.id === lectureId)
+            )
+
+            setLecture(foundLecture)
+            setCourseId(course.id)
+            setCourseName(fullCourse.title)
+            setUnitName(foundUnit?.title || "")
+
+            const idx = allLectures.findIndex((l: Lecture) => l.id === lectureId)
+            setPrevLectureId(idx > 0 ? allLectures[idx - 1].id : null)
+            setNextLectureId(idx < allLectures.length - 1 ? allLectures[idx + 1].id : null)
+
+            try {
+              const exams = await examsAPI.getByCourse(course.id) as any[]
+              const lectureExam = exams.find((e: any) => e.lecture_id === lectureId)
+              if (lectureExam) setExam(lectureExam)
+            } catch {}
+
+            break
+          }
+        }
+      } catch (err: any) {
+        setError(err.message || "حصل خطأ في تحميل المحاضرة")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchLecture()
+  }, [lectureId])
+
+  const studentWatermark = user
+    ? `${user.first_name} ${user.last_name} - ${user.phone}`
+    : ""
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-5 w-32" />
+        <Card className="overflow-hidden">
+          <Skeleton className="aspect-video w-full" />
+          <CardContent className="p-4 md:p-6 space-y-3">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-7 w-3/4" />
+            <div className="flex justify-between pt-2">
+              <Skeleton className="h-10 w-36" />
+              <Skeleton className="h-10 w-36" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error || !lecture) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-16">
+        <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+        <h2 className="text-xl font-bold mb-2">مش قادر أحمل المحاضرة</h2>
+        <p className="text-muted-foreground mb-6">{error || "المحاضرة مش موجودة أو مش مشترك فيها"}</p>
+        <Button asChild variant="outline">
+          <Link href="/dashboard/courses">
+            <ArrowRight className="w-4 h-4 ml-2" />
+            العودة للكورسات
+          </Link>
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      {/* Back Button */}
-      <Link 
-        href={`/dashboard/courses/${lectureData.courseId}`}
+      <Link
+        href={courseId ? `/dashboard/courses/${courseId}` : "/dashboard/courses"}
         className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowRight className="w-4 h-4" />
         <span>العودة للكورس</span>
       </Link>
 
-      {/* Video Player */}
       <Card className="overflow-hidden">
         <div className="relative aspect-video bg-black">
-          {/* Video */}
-          <iframe 
-            src={lectureData.videoUrl}
-            className="absolute inset-0 w-full h-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-          
-          {/* Watermark */}
-          <div 
-            className="absolute text-white/40 text-sm font-bold pointer-events-none select-none transition-all duration-1000"
-            style={{
-              left: `${watermarkPosition.x}%`,
-              top: `${watermarkPosition.y}%`,
-              transform: 'translate(-50%, -50%)',
-              textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
-            }}
-          >
-            {studentName}
-          </div>
-
-          {/* Custom Controls Overlay (placeholder) */}
-          <div className="absolute bottom-0 right-0 left-0 bg-linear-to-t from-black/80 to-transparent p-4 opacity-0 hover:opacity-100 transition-opacity">
-            <div className="flex items-center justify-between text-white">
-              <div className="flex items-center gap-3">
-                <button className="hover:text-primary transition-colors">
-                  {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                </button>
-                <button className="hover:text-primary transition-colors">
-                  <Volume2 className="w-5 h-5" />
-                </button>
-                <span className="text-sm">00:00 / {lectureData.duration}</span>
-              </div>
-              <button className="hover:text-primary transition-colors">
-                <Maximize className="w-5 h-5" />
-              </button>
+          {lecture.video_url ? (
+            <>
+              <iframe
+                src={lecture.video_url}
+                className="absolute inset-0 w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+              {studentWatermark && (
+                <div
+                  className="absolute text-white/40 text-sm font-bold pointer-events-none select-none transition-all duration-1000 z-10"
+                  style={{
+                    left: `${watermarkPosition.x}%`,
+                    top: `${watermarkPosition.y}%`,
+                    transform: "translate(-50%, -50%)",
+                    textShadow: "1px 1px 2px rgba(0,0,0,0.8)",
+                  }}
+                >
+                  {studentWatermark}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-white/60">
+              <p>الفيديو مش متاح</p>
             </div>
-          </div>
+          )}
         </div>
-        
+
         <CardContent className="p-4 md:p-6">
-          {/* Lecture Info */}
           <div className="mb-4">
             <p className="text-sm text-muted-foreground mb-1">
-              {lectureData.courseName} &bull; {lectureData.unitName}
+              {courseName}
+              {unitName && <> &bull; {unitName}</>}
+              {lecture.duration_minutes && <> &bull; {lecture.duration_minutes} دقيقة</>}
             </p>
             <h1 className="text-xl md:text-2xl font-bold text-foreground">
-              {lectureData.title}
+              {lecture.title}
             </h1>
+            {lecture.description && (
+              <p className="text-muted-foreground mt-2 text-sm">{lecture.description}</p>
+            )}
           </div>
 
-          {/* Navigation */}
           <div className="flex items-center justify-between">
             <Button
               variant="outline"
-              disabled={!lectureData.prevLectureId}
-              asChild={!!lectureData.prevLectureId}
+              disabled={!prevLectureId}
+              asChild={!!prevLectureId}
             >
-              {lectureData.prevLectureId ? (
-                <Link href={`/dashboard/watch/${lectureData.prevLectureId}`} className="flex items-center gap-2">
+              {prevLectureId ? (
+                <Link href={`/dashboard/watch/${prevLectureId}`} className="flex items-center gap-2">
                   <ChevronRight className="w-4 h-4" />
                   المحاضرة السابقة
                 </Link>
@@ -135,14 +229,14 @@ export default function WatchPage() {
                 </span>
               )}
             </Button>
-            
+
             <Button
-              disabled={!lectureData.nextLectureId}
-              asChild={!!lectureData.nextLectureId}
+              disabled={!nextLectureId}
+              asChild={!!nextLectureId}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              {lectureData.nextLectureId ? (
-                <Link href={`/dashboard/watch/${lectureData.nextLectureId}`} className="flex items-center gap-2">
+              {nextLectureId ? (
+                <Link href={`/dashboard/watch/${nextLectureId}`} className="flex items-center gap-2">
                   المحاضرة التالية
                   <ChevronLeft className="w-4 h-4" />
                 </Link>
@@ -157,48 +251,48 @@ export default function WatchPage() {
         </CardContent>
       </Card>
 
-      {/* Related Content */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {lectureData.hasAttachment && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="w-5 h-5 text-secondary" />
-                ملف الشرح
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm mb-4">
-                {lectureData.attachmentName}
-              </p>
-              <Button variant="outline" className="w-full">
-                عرض الملف
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+      {(lecture.pdf_url || exam) && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {lecture.pdf_url && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-secondary" />
+                  ملف الشرح
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button asChild variant="outline" className="w-full">
+                  <a href={lecture.pdf_url} target="_blank" rel="noopener noreferrer">
+                    عرض الملف
+                  </a>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-        {lectureData.hasExam && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileCheck className="w-5 h-5 text-chart-4" />
-                اختبار المحاضرة
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm mb-4">
-                اختبر نفسك بعد مشاهدة المحاضرة
-              </p>
-              <Button asChild className="w-full bg-chart-4 hover:bg-chart-4/90 text-white">
-                <Link href={`/dashboard/exam/${lectureData.examId}`}>
-                  ابدأ الاختبار
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          {exam && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileCheck className="w-5 h-5 text-chart-4" />
+                  اختبار المحاضرة
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground text-sm mb-4">
+                  {exam.title} &bull; {exam.duration_minutes} دقيقة
+                </p>
+                <Button asChild className="w-full bg-chart-4 hover:bg-chart-4/90 text-white">
+                  <Link href={`/dashboard/exam/${exam.id}`}>
+                    ابدأ الاختبار
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   )
 }

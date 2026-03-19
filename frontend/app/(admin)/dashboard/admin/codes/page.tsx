@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  KeyRound, Plus, RefreshCw, Copy, CheckCircle, XCircle, Clock, Ban
+  KeyRound, Plus, RefreshCw, Copy, CheckCircle, XCircle, Clock, Ban, Trash2
 } from "lucide-react"
 import { codesAPI, coursesAPI } from "@/lib/api"
 
@@ -116,6 +116,16 @@ export default function CodesPage() {
     try {
       await codesAPI.disable(id)
       setCodes(prev => prev.map(c => c.id === id ? { ...c, status: "disabled" } : c))
+    } catch (err: any) {
+      alert(err.message || "حصل خطأ")
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("هتحذف الكود ده نهائياً. متأكد؟")) return
+    try {
+      await codesAPI.delete(id)
+      setCodes(prev => prev.filter(c => c.id !== id))
     } catch (err: any) {
       alert(err.message || "حصل خطأ")
     }
@@ -316,18 +326,31 @@ export default function CodesPage() {
                         : "—"}
                     </span>
 
-                    {/* Disable button */}
-                    {code.status === "active" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                        onClick={() => handleDisable(code.id)}
-                      >
-                        <Ban className="w-4 h-4 ml-1" />
-                        تعطيل
-                      </Button>
-                    )}
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {code.status === "active" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDisable(code.id)}
+                        >
+                          <Ban className="w-4 h-4 ml-1" />
+                          تعطيل
+                        </Button>
+                      )}
+                      {(code.status === "active" || code.status === "disabled") && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDelete(code.id)}
+                          title="حذف الكود"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )
               })}

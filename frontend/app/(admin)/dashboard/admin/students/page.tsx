@@ -1,86 +1,113 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Users, Search, RefreshCw, CheckCircle, XCircle,
-  Smartphone, ShieldOff, ChevronDown, ChevronUp
-} from "lucide-react"
-import { usersAPI } from "@/lib/api"
+  Users,
+  Search,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  Smartphone,
+  ShieldOff,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+} from "lucide-react";
+import { usersAPI } from "@/lib/api";
 
 interface Student {
-  id: string
-  first_name: string
-  last_name: string
-  phone: string
-  grade?: string
-  governorate?: string
-  is_active: boolean
-  enrolled_courses: string[]
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  grade?: string;
+  governorate?: string;
+  is_active: boolean;
+  enrolled_courses: string[];
 }
 
 const gradeLabels: Record<string, string> = {
   first_secondary: "أولى ثانوي",
   second_secondary: "ثانية ثانوي",
   third_secondary: "ثالثة ثانوي",
-}
+};
 
 export default function StudentsPage() {
-  const [students, setStudents] = useState<Student[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [search, setSearch] = useState("")
-  const [loadingAction, setLoadingAction] = useState<string | null>(null)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => { fetchStudents() }, [])
+  useEffect(() => {
+    fetchStudents();
+  }, []);
 
   const fetchStudents = async () => {
-    setIsLoading(true)
-    setError("")
+    setIsLoading(true);
+    setError("");
     try {
-      const data = await usersAPI.getAll() as Student[]
-      setStudents(data)
+      const data = (await usersAPI.getAll()) as Student[];
+      setStudents(data);
     } catch (err: any) {
-      setError(err.message || "حصل خطأ في تحميل الطلاب")
+      setError(err.message || "حصل خطأ في تحميل الطلاب");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleToggleActive = async (id: string) => {
-    setLoadingAction(`toggle-${id}`)
+    setLoadingAction(`toggle-${id}`);
     try {
-      await usersAPI.toggleActive(id)
-      setStudents(prev => prev.map(s =>
-        s.id === id ? { ...s, is_active: !s.is_active } : s
-      ))
+      await usersAPI.toggleActive(id);
+      setStudents((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, is_active: !s.is_active } : s)),
+      );
     } catch (err: any) {
-      alert(err.message || "حصل خطأ")
+      alert(err.message || "حصل خطأ");
     } finally {
-      setLoadingAction(null)
+      setLoadingAction(null);
     }
-  }
+  };
 
   const handleResetDevice = async (id: string) => {
-    if (!confirm("هتعمل reset للجهاز — الطالب هيقدر يسجل من جهاز جديد. متأكد؟")) return
-    setLoadingAction(`reset-${id}`)
+    if (!confirm("هتعمل reset للجهاز — الطالب هيقدر يسجل من جهاز جديد. متأكد؟"))
+      return;
+    setLoadingAction(`reset-${id}`);
     try {
-      await usersAPI.resetDevice(id)
-      alert("تم reset الجهاز بنجاح")
+      await usersAPI.resetDevice(id);
+      alert("تم reset الجهاز بنجاح");
     } catch (err: any) {
-      alert(err.message || "حصل خطأ")
+      alert(err.message || "حصل خطأ");
     } finally {
-      setLoadingAction(null)
+      setLoadingAction(null);
     }
-  }
+  };
 
-  const filtered = students.filter(s =>
-    `${s.first_name} ${s.last_name} ${s.phone}`.toLowerCase().includes(search.toLowerCase())
-  )
+  const handleDeleteStudent = async (id: string, name: string) => {
+    if (!confirm(`هتحذف حساب ${name} نهائياً — مش هيرجع. متأكد؟`)) return;
+    setLoadingAction(`delete-${id}`);
+    try {
+      await usersAPI.deleteStudent(id);
+      setStudents((prev) => prev.filter((s) => s.id !== id));
+      setExpandedId(null);
+    } catch (err: any) {
+      alert(err.message || "حصل خطأ في الحذف");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const filtered = students.filter((s) =>
+    `${s.first_name} ${s.last_name} ${s.phone}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
 
   return (
     <div className="space-y-6">
@@ -92,7 +119,9 @@ export default function StudentsPage() {
           </p>
         </div>
         <Button variant="outline" onClick={fetchStudents} disabled={isLoading}>
-          <RefreshCw className={`w-4 h-4 ml-2 ${isLoading ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`w-4 h-4 ml-2 ${isLoading ? "animate-spin" : ""}`}
+          />
           تحديث
         </Button>
       </div>
@@ -103,7 +132,7 @@ export default function StudentsPage() {
         <Input
           placeholder="ابحث باسم الطالب أو الهاتف..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
           className="pr-10"
         />
       </div>
@@ -111,7 +140,9 @@ export default function StudentsPage() {
       {error && (
         <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center justify-between">
           <p className="text-destructive text-sm">{error}</p>
-          <Button variant="ghost" size="sm" onClick={fetchStudents}>إعادة المحاولة</Button>
+          <Button variant="ghost" size="sm" onClick={fetchStudents}>
+            إعادة المحاولة
+          </Button>
         </div>
       )}
 
@@ -130,7 +161,7 @@ export default function StudentsPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="divide-y divide-border">
-              {[1, 2, 3, 4, 5].map(i => (
+              {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="p-4 flex items-center gap-4">
                   <Skeleton className="w-10 h-10 rounded-full" />
                   <div className="flex-1 space-y-2">
@@ -150,14 +181,19 @@ export default function StudentsPage() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {filtered.map(student => (
+              {filtered.map((student) => (
                 <div key={student.id}>
                   {/* Row */}
                   <div className="p-4 flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                      student.is_active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {student.first_name[0]}{student.last_name[0]}
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                        student.is_active
+                          ? "bg-primary/10 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {student.first_name[0]}
+                      {student.last_name[0]}
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -171,11 +207,17 @@ export default function StudentsPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground" dir="ltr">{student.phone}</p>
+                      <p className="text-sm text-muted-foreground" dir="ltr">
+                        {student.phone}
+                      </p>
                     </div>
 
                     <div className="hidden md:block text-sm text-muted-foreground text-left shrink-0">
-                      <p>{gradeLabels[student.grade || ""] || student.grade || "—"}</p>
+                      <p>
+                        {gradeLabels[student.grade || ""] ||
+                          student.grade ||
+                          "—"}
+                      </p>
                       <p>{student.enrolled_courses.length} كورس</p>
                     </div>
 
@@ -183,23 +225,43 @@ export default function StudentsPage() {
                       <Button
                         size="sm"
                         variant={student.is_active ? "destructive" : "default"}
-                        className={student.is_active ? "" : "bg-chart-3 hover:bg-chart-3/90 text-white"}
+                        className={
+                          student.is_active
+                            ? ""
+                            : "bg-chart-3 hover:bg-chart-3/90 text-white"
+                        }
                         disabled={loadingAction === `toggle-${student.id}`}
                         onClick={() => handleToggleActive(student.id)}
                       >
-                        {loadingAction === `toggle-${student.id}` ? "..." : student.is_active ? (
-                          <><XCircle className="w-4 h-4 ml-1" />إيقاف</>
+                        {loadingAction === `toggle-${student.id}` ? (
+                          "..."
+                        ) : student.is_active ? (
+                          <>
+                            <XCircle className="w-4 h-4 ml-1" />
+                            إيقاف
+                          </>
                         ) : (
-                          <><CheckCircle className="w-4 h-4 ml-1" />تفعيل</>
+                          <>
+                            <CheckCircle className="w-4 h-4 ml-1" />
+                            تفعيل
+                          </>
                         )}
                       </Button>
 
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setExpandedId(expandedId === student.id ? null : student.id)}
+                        onClick={() =>
+                          setExpandedId(
+                            expandedId === student.id ? null : student.id,
+                          )
+                        }
                       >
-                        {expandedId === student.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        {expandedId === student.id ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -210,19 +272,27 @@ export default function StudentsPage() {
                       <div className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">المرحلة</p>
-                          <p className="font-medium">{gradeLabels[student.grade || ""] || "—"}</p>
+                          <p className="font-medium">
+                            {gradeLabels[student.grade || ""] || "—"}
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">المحافظة</p>
-                          <p className="font-medium">{student.governorate || "—"}</p>
+                          <p className="font-medium">
+                            {student.governorate || "—"}
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">الكورسات</p>
-                          <p className="font-medium">{student.enrolled_courses.length} كورس</p>
+                          <p className="font-medium">
+                            {student.enrolled_courses.length} كورس
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">الحالة</p>
-                          <p className={`font-medium ${student.is_active ? "text-chart-3" : "text-destructive"}`}>
+                          <p
+                            className={`font-medium ${student.is_active ? "text-chart-3" : "text-destructive"}`}
+                          >
                             {student.is_active ? "نشط" : "موقوف"}
                           </p>
                         </div>
@@ -236,7 +306,25 @@ export default function StudentsPage() {
                           onClick={() => handleResetDevice(student.id)}
                         >
                           <Smartphone className="w-4 h-4 ml-2" />
-                          {loadingAction === `reset-${student.id}` ? "جاري الـ reset..." : "Reset الجهاز"}
+                          {loadingAction === `reset-${student.id}`
+                            ? "جاري الـ reset..."
+                            : "Reset الجهاز"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={loadingAction === `delete-${student.id}`}
+                          onClick={() =>
+                            handleDeleteStudent(
+                              student.id,
+                              `${student.first_name} ${student.last_name}`,
+                            )
+                          }
+                        >
+                          <Trash2 className="w-4 h-4 ml-2" />
+                          {loadingAction === `delete-${student.id}`
+                            ? "جاري الحذف..."
+                            : "حذف الحساب"}
                         </Button>
                       </div>
                     </div>
@@ -248,5 +336,5 @@ export default function StudentsPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

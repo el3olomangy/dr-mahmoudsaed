@@ -41,10 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const savedUser = localStorage.getItem("user")
 
       if (savedToken && savedUser) {
+        const parsedUser = JSON.parse(savedUser)
         setToken(savedToken)
-        setUser(JSON.parse(savedUser))
-        // sync الـ cookie عشان الـ middleware يشتغل صح
+        setUser(parsedUser)
+        // sync الـ cookies عشان الـ middleware يشتغل صح
         document.cookie = `token=${savedToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+        document.cookie = `user_role=${parsedUser.role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
       }
     } catch (error) {
       // لو البيانات corrupt نمسحها
@@ -58,8 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback((newToken: string, newUser: User) => {
     localStorage.setItem("token", newToken)
     localStorage.setItem("user", JSON.stringify(newUser))
-    // حط الـ token في cookie عشان الـ middleware يشوفه
+    // حط الـ token والـ role في cookies عشان الـ middleware والـ layouts يشوفوهم فوراً
     document.cookie = `token=${newToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+    document.cookie = `user_role=${newUser.role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
     setToken(newToken)
     setUser(newUser)
   }, [])
@@ -67,8 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem("token")
     localStorage.removeItem("user")
-    // امسح الـ cookie
+    // امسح الـ cookies
     document.cookie = "token=; path=/; max-age=0"
+    document.cookie = "user_role=; path=/; max-age=0"
     setToken(null)
     setUser(null)
     router.push("/login")

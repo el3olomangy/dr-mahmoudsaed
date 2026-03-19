@@ -64,7 +64,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}>
         {/* Logo */}
         <div className="p-6 border-b border-border flex items-center justify-between">
-          <Link href="/">
+          <Link href="/dashboard/admin">
             <Image
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-BuyHgoZLI0SWgDwWIvZe8lSxWIu1dX.png"
               alt="العلومنجي"

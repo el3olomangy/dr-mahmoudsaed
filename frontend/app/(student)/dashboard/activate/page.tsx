@@ -15,7 +15,6 @@ export default function ActivateCodePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle")
   const [message, setMessage] = useState("")
-  const [courseName, setCourseName] = useState("")
   const { updateUser, user } = useAuth()
   const router = useRouter()
 
@@ -30,12 +29,15 @@ export default function ActivateCodePage() {
       const data: any = await codesAPI.activate(code.trim())
 
       // حدّث الـ enrolled_courses في الـ AuthContext
-      if (data.course_id && user) {
-        const updatedCourses = [...(user.enrolled_courses || []), data.course_id]
+      // الـ API بيرجع enrolled_courses كـ list من الـ IDs الجديدة
+      if (data.enrolled_courses?.length && user) {
+        const updatedCourses = [
+          ...(user.enrolled_courses || []),
+          ...data.enrolled_courses.filter((id: string) => !user.enrolled_courses?.includes(id))
+        ]
         updateUser({ enrolled_courses: updatedCourses })
       }
 
-      setCourseName(data.course_title || "الكورس")
       setStatus("success")
       setMessage(data.message || "تم تفعيل الكود بنجاح!")
       setCode("")
@@ -88,11 +90,6 @@ export default function ActivateCodePage() {
                 <CheckCircle className="w-5 h-5 text-chart-3 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-chart-3 font-bold text-sm">{message}</p>
-                  {courseName && (
-                    <p className="text-chart-3/80 text-sm mt-1">
-                      يمكنك الآن الوصول لـ <span className="font-bold">{courseName}</span>
-                    </p>
-                  )}
                 </div>
               </div>
             )}

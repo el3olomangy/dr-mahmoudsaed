@@ -1,153 +1,25 @@
-# ==========================================
-# EL3OLOMANGY PLATFORM - GITIGNORE
-# ==========================================
+# ====== Frontend ======
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/.env*.local
+frontend/out/
+frontend/.turbo/
 
-# ------------------------------------------
-# 1. ENVIRONMENT & SECRETS (مهم جداً!)
-# ------------------------------------------
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-secrets.json
-credentials.json
+# ====== Backend ======
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.venv/
+backend/venv/
+backend/.env
 
-# ------------------------------------------
-# 2. PYTHON - VIRTUAL ENVIRONMENT
-# ------------------------------------------
-venv/
-env/
-ENV/
-.venv/
-.virtualenv/
-pythonenv*/
+# ====== VS Code ======
+.vscode/
 
-# ------------------------------------------
-# 3. PYTHON - CACHE & COMPILED
-# ------------------------------------------
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.nox/
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.ruff_cache/
-
-# ------------------------------------------
-# 4. NODE.JS / REACT
-# ------------------------------------------
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-.npm
-.yarn-integrity
-.pnp.*
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
-# ------------------------------------------
-# 5. BUILD & DISTRIBUTION
-# ------------------------------------------
-build/
-dist/
-out/
-.next/
-.nuxt/
-.cache/
-.parcel-cache/
-.vite/
-.vitepress/dist
-*.tsbuildinfo
-
-# ------------------------------------------
-# 6. TESTING
-# ------------------------------------------
-coverage/
-.nyc_output/
-*.lcov
-
-# ------------------------------------------
-# 7. IDE & EDITOR FILES
-# ------------------------------------------
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json.example
-.idea/
-*.swp
-*.swo
-*~
+# ====== General ======
 .DS_Store
 Thumbs.db
-*.sublime-project
-*.sublime-workspace
-.project
-.classpath
-.settings/
-*.code-workspace
-
-# ------------------------------------------
-# 8. LOGS
-# ------------------------------------------
-logs/
 *.log
-*.log.*
-log/
-debug/
-
-# ------------------------------------------
-# 9. DATABASE
-# ------------------------------------------
-*.sqlite
-*.sqlite3
-*.db
-*.sql
-!schema.sql
-!migrations/
-
-# ------------------------------------------
-# 10. OS FILES
-# ------------------------------------------
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-
-# ------------------------------------------
-# 11. PROJECT SPECIFIC
-# ------------------------------------------
 structure.txt
-*.bak
-*.tmp
-.temp/
-tmp/

@@ -1,81 +1,106 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { 
-  ArrowRight, 
-  ChevronLeft, 
-  ChevronRight, 
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react"
+import { examsAPI } from "@/lib/api"
 
-// Mock exam data
-const examData = {
-  id: 4,
-  title: "اختبار الوحدة الأولى",
-  courseId: 1,
-  courseName: "الكيمياء العضوية",
-  duration: 30, // minutes
-  questions: [
-    {
-      id: 1,
-      type: "mcq",
-      text: "ما هو العنصر الأساسي في المركبات العضوية؟",
-      options: ["الكربون", "الهيدروجين", "الأكسجين", "النيتروجين"],
-      correctAnswer: 0,
-    },
-    {
-      id: 2,
-      type: "mcq",
-      text: "أي من التالي يُعد من الهيدروكربونات المشبعة؟",
-      options: ["الإيثين", "الإيثاين", "الإيثان", "البنزين"],
-      correctAnswer: 2,
-    },
-    {
-      id: 3,
-      type: "mcq",
-      text: "الصيغة العامة للألكانات هي:",
-      options: ["CnH2n", "CnH2n+2", "CnH2n-2", "CnHn"],
-      correctAnswer: 1,
-    },
-    {
-      id: 4,
-      type: "essay",
-      text: "اشرح بإيجاز الفرق بين الروابط الأحادية والمزدوجة والثلاثية في المركبات العضوية.",
-    },
-    {
-      id: 5,
-      type: "mcq",
-      text: "ما نوع التهجين في ذرة الكربون في الميثان؟",
-      options: ["sp", "sp2", "sp3", "sp3d"],
-      correctAnswer: 2,
-    },
-  ],
+interface Choice {
+  id: string
+  text: string
 }
 
-type ExamState = "intro" | "taking" | "result"
+interface Question {
+  id: string
+  text: string
+  question_type: "mcq" | "essay"
+  choices: Choice[]
+  points: number
+}
 
-export default function ExamPage() {
-  const [examState, setExamState] = useState<ExamState>("intro")
+interface Exam {
+  id: string
+  title: string
+  duration_minutes: number
+  questions: Question[]
+}
+
+interface ExamResult {
+  score: number
+  passed: boolean
+  earned_points: number
+  total_points: number
+  submitted_at: string
+}
+
+type ExamState = "loading" | "error" | "already_done" | "intro" | "taking" | "submitting" | "result"
+
+// إجابات الطالب: question_id -> choice_id أو نص مقالي
+type Answers = Record<string, string>
+
+export default function ExamPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: examId } = use(params)
+
+  const [examState, setExamState] = useState<ExamState>("loading")
+  const [exam, setExam] = useState<Exam | null>(null)
+  const [previousResult, setPreviousResult] = useState<ExamResult | null>(null)
+  const [errorMsg, setErrorMsg] = useState("")
+
   const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [answers, setAnswers] = useState<Record<number, string | number>>({})
-  const [timeLeft, setTimeLeft] = useState(examData.duration * 60)
-  const [showResults, setShowResults] = useState(false)
+  const [answers, setAnswers] = useState<Answers>({})
+  const [timeLeft, setTimeLeft] = useState(0)
+  const [result, setResult] = useState<ExamResult | null>(null)
+  const [showReview, setShowReview] = useState(false)
 
-  // Timer
+  // تحميل الاختبار + التحقق من نتيجة سابقة
+  useEffect(() => {
+    const fetchExam = async () => {
+      try {
+        // جيب بيانات الاختبار
+        const data = await examsAPI.getOne(examId) as Exam
+        setExam(data)
+        setTimeLeft(data.duration_minutes * 60)
+
+        // تحقق لو الطالب عمل الاختبار ده قبل كده
+        try {
+          const prevResult = await examsAPI.getMyResult(examId) as ExamResult
+          setPreviousResult(prevResult)
+          setExamState("already_done")
+        } catch {
+          // مش عملوش قبل كده — طبيعي
+          setExamState("intro")
+        }
+      } catch (err: any) {
+        setErrorMsg(err.message || "حصل خطأ في تحميل الاختبار")
+        setExamState("error")
+      }
+    }
+    fetchExam()
+  }, [examId])
+
+  // تايمر
   useEffect(() => {
     if (examState !== "taking") return
-    
+    if (timeLeft <= 0) {
+      handleSubmit()
+      return
+    }
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
+      setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timer)
           handleSubmit()
@@ -84,45 +109,151 @@ export default function ExamPage() {
         return prev - 1
       })
     }, 1000)
-
     return () => clearInterval(timer)
   }, [examState])
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0")
+    const s = (seconds % 60).toString().padStart(2, "0")
+    return `${m}:${s}`
   }
 
-  const handleAnswer = (questionId: number, answer: string | number) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: answer }))
+  const handleAnswer = (questionId: string, value: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }))
   }
 
-  const handleSubmit = () => {
-    setExamState("result")
-  }
+  const handleSubmit = async () => {
+    if (!exam) return
+    setExamState("submitting")
 
-  const calculateScore = () => {
-    let correct = 0
-    examData.questions.forEach((q) => {
-      if (q.type === "mcq" && answers[q.id] === q.correctAnswer) {
-        correct++
+    // بناء الـ answers بالشكل اللي بيتوقعه الـ API
+    const answersPayload = exam.questions.map(q => {
+      const val = answers[q.id]
+      if (q.question_type === "mcq") {
+        return { question_id: q.id, selected_choice: val || null, essay_answer: null }
+      } else {
+        return { question_id: q.id, selected_choice: null, essay_answer: val || null }
       }
     })
-    const mcqCount = examData.questions.filter(q => q.type === "mcq").length
-    return Math.round((correct / mcqCount) * 100)
+
+    try {
+      const res: any = await examsAPI.submit({ exam_id: examId, answers: answersPayload })
+
+      // لو النتيجة فورية
+      if (res.score !== undefined) {
+        setResult({
+          score: res.score,
+          passed: res.passed,
+          earned_points: res.earned_points,
+          total_points: res.total_points,
+          submitted_at: new Date().toISOString(),
+        })
+        setExamState("result")
+      } else {
+        // النتيجة هتظهر بعدين
+        setResult(null)
+        setExamState("result")
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "حصل خطأ في تسليم الاختبار")
+      setExamState("error")
+    }
   }
 
-  // Intro Screen
-  if (examState === "intro") {
+  // ====== Loading ======
+  if (examState === "loading") {
+    return (
+      <div className="max-w-2xl mx-auto space-y-4">
+        <Skeleton className="h-5 w-32" />
+        <Card>
+          <CardContent className="p-8 space-y-4">
+            <Skeleton className="h-8 w-1/2 mx-auto" />
+            <Skeleton className="h-4 w-1/3 mx-auto" />
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <Skeleton className="h-20 rounded-xl" />
+              <Skeleton className="h-20 rounded-xl" />
+            </div>
+            <Skeleton className="h-12 w-full rounded-xl mt-4" />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // ====== Error ======
+  if (examState === "error") {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-16">
+        <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+        <h2 className="text-xl font-bold mb-2">حصل خطأ</h2>
+        <p className="text-muted-foreground mb-6">{errorMsg}</p>
+        <Button asChild variant="outline">
+          <Link href="/dashboard/courses">
+            <ArrowRight className="w-4 h-4 ml-2" />
+            العودة للكورسات
+          </Link>
+        </Button>
+      </div>
+    )
+  }
+
+  // ====== Already Done ======
+  if (examState === "already_done" && previousResult) {
     return (
       <div className="max-w-2xl mx-auto">
-        <Link 
-          href={`/dashboard/courses/${examData.courseId}`}
+        <Card>
+          <CardHeader className="text-center">
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${previousResult.passed ? "bg-chart-3/10" : "bg-destructive/10"}`}>
+              {previousResult.passed
+                ? <CheckCircle className="w-10 h-10 text-chart-3" />
+                : <XCircle className="w-10 h-10 text-destructive" />}
+            </div>
+            <CardTitle className="text-2xl font-extrabold">
+              {exam?.title}
+            </CardTitle>
+            <p className="text-muted-foreground mt-1">عملت الاختبار ده قبل كده</p>
+          </CardHeader>
+          <CardContent className="text-center space-y-6">
+            <div className="text-6xl font-extrabold text-primary">
+              {Math.round(previousResult.score)}%
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-chart-3/10 rounded-xl">
+                <p className="text-2xl font-bold text-chart-3">{previousResult.earned_points}</p>
+                <p className="text-sm text-muted-foreground">درجاتك</p>
+              </div>
+              <div className="p-4 bg-muted rounded-xl">
+                <p className="text-2xl font-bold text-foreground">{previousResult.total_points}</p>
+                <p className="text-sm text-muted-foreground">إجمالي الدرجات</p>
+              </div>
+            </div>
+            <div className={`p-4 rounded-xl font-bold text-lg ${previousResult.passed ? "bg-chart-3/10 text-chart-3" : "bg-destructive/10 text-destructive"}`}>
+              {previousResult.passed ? "ناجح ✓" : "لم تنجح"}
+            </div>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/dashboard/courses">
+                <ArrowRight className="w-4 h-4 ml-2" />
+                العودة للكورسات
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // ====== Intro ======
+  if (examState === "intro" && exam) {
+    const mcqCount = exam.questions.filter(q => q.question_type === "mcq").length
+    const essayCount = exam.questions.filter(q => q.question_type === "essay").length
+    return (
+      <div className="max-w-2xl mx-auto">
+        <Link
+          href="/dashboard/courses"
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
         >
           <ArrowRight className="w-4 h-4" />
-          <span>العودة للكورس</span>
+          <span>العودة للكورسات</span>
         </Link>
 
         <Card>
@@ -130,32 +261,30 @@ export default function ExamPage() {
             <div className="w-16 h-16 bg-chart-4/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <Clock className="w-8 h-8 text-chart-4" />
             </div>
-            <CardTitle className="text-2xl font-extrabold">{examData.title}</CardTitle>
-            <p className="text-muted-foreground">{examData.courseName}</p>
+            <CardTitle className="text-2xl font-extrabold">{exam.title}</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-muted rounded-xl">
-                <p className="text-2xl font-bold text-foreground">{examData.questions.length}</p>
+                <p className="text-2xl font-bold text-foreground">{exam.questions.length}</p>
                 <p className="text-sm text-muted-foreground">عدد الأسئلة</p>
               </div>
               <div className="p-4 bg-muted rounded-xl">
-                <p className="text-2xl font-bold text-foreground">{examData.duration} دقيقة</p>
+                <p className="text-2xl font-bold text-foreground">{exam.duration_minutes} دقيقة</p>
                 <p className="text-sm text-muted-foreground">مدة الاختبار</p>
               </div>
             </div>
 
-            <div className="p-4 bg-chart-4/10 border border-chart-4/30 rounded-xl text-right">
+            <div className="p-4 bg-chart-4/10 border border-chart-4/30 rounded-xl text-right space-y-1">
               <h3 className="font-bold text-foreground mb-2">تعليمات مهمة:</h3>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>- الاختبار يحتوي على أسئلة اختيار من متعدد ومقالية</li>
-                <li>- سيتم حساب الوقت تلقائياً</li>
-                <li>- بعد انتهاء الوقت سيتم تسليم الاختبار تلقائياً</li>
-                <li>- يمكنك التنقل بين الأسئلة قبل التسليم</li>
-              </ul>
+              {mcqCount > 0 && <p className="text-sm text-muted-foreground">- {mcqCount} سؤال اختيار من متعدد</p>}
+              {essayCount > 0 && <p className="text-sm text-muted-foreground">- {essayCount} سؤال مقالي</p>}
+              <p className="text-sm text-muted-foreground">- الوقت بيتحسب من لما تضغط ابدأ</p>
+              <p className="text-sm text-muted-foreground">- لو الوقت خلص هيتسلم تلقائياً</p>
+              <p className="text-sm text-muted-foreground">- الاختبار مرة واحدة بس</p>
             </div>
 
-            <Button 
+            <Button
               onClick={() => setExamState("taking")}
               className="w-full bg-chart-4 hover:bg-chart-4/90 text-white font-bold py-6"
             >
@@ -167,129 +296,129 @@ export default function ExamPage() {
     )
   }
 
-  // Result Screen
+  // ====== Result ======
   if (examState === "result") {
-    const score = calculateScore()
-    const isPassed = score >= 50
+    // النتيجة الفورية
+    if (result) {
+      return (
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader className="text-center">
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${result.passed ? "bg-chart-3/10" : "bg-destructive/10"}`}>
+                {result.passed
+                  ? <CheckCircle className="w-10 h-10 text-chart-3" />
+                  : <XCircle className="w-10 h-10 text-destructive" />}
+              </div>
+              <CardTitle className="text-2xl font-extrabold">
+                {result.passed ? "أحسنت!" : "حاول تذاكر أكتر"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-6">
+              <div className="text-6xl font-extrabold text-primary">{Math.round(result.score)}%</div>
 
-    return (
-      <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader className="text-center">
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${isPassed ? 'bg-chart-3/10' : 'bg-destructive/10'}`}>
-              {isPassed ? (
-                <CheckCircle className="w-10 h-10 text-chart-3" />
-              ) : (
-                <XCircle className="w-10 h-10 text-destructive" />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 bg-muted rounded-xl">
+                  <p className="text-xl font-bold text-foreground">{exam?.questions.length}</p>
+                  <p className="text-xs text-muted-foreground">أسئلة</p>
+                </div>
+                <div className="p-4 bg-chart-3/10 rounded-xl">
+                  <p className="text-xl font-bold text-chart-3">{result.earned_points}</p>
+                  <p className="text-xs text-muted-foreground">درجاتك</p>
+                </div>
+                <div className="p-4 bg-muted rounded-xl">
+                  <p className="text-xl font-bold text-foreground">{result.total_points}</p>
+                  <p className="text-xs text-muted-foreground">الإجمالي</p>
+                </div>
+              </div>
+
+              {/* مراجعة إجابات MCQ */}
+              {exam && (
+                <Button
+                  onClick={() => setShowReview(!showReview)}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {showReview ? "إخفاء" : "مراجعة"} الإجابات
+                </Button>
               )}
-            </div>
-            <CardTitle className="text-2xl font-extrabold">
-              {isPassed ? "أحسنت!" : "حاول مرة أخرى"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-6">
-            <div className="text-6xl font-extrabold text-primary">{score}%</div>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-4 bg-muted rounded-xl">
-                <p className="text-xl font-bold text-foreground">{examData.questions.length}</p>
-                <p className="text-xs text-muted-foreground">عدد الأسئلة</p>
-              </div>
-              <div className="p-4 bg-chart-3/10 rounded-xl">
-                <p className="text-xl font-bold text-chart-3">
-                  {examData.questions.filter(q => q.type === "mcq" && answers[q.id] === q.correctAnswer).length}
-                </p>
-                <p className="text-xs text-muted-foreground">إجابات صحيحة</p>
-              </div>
-              <div className="p-4 bg-destructive/10 rounded-xl">
-                <p className="text-xl font-bold text-destructive">
-                  {examData.questions.filter(q => q.type === "mcq" && answers[q.id] !== q.correctAnswer).length}
-                </p>
-                <p className="text-xs text-muted-foreground">إجابات خاطئة</p>
-              </div>
-            </div>
 
-            <Button 
-              onClick={() => setShowResults(!showResults)}
-              variant="outline"
-              className="w-full"
-            >
-              {showResults ? "إخفاء" : "مراجعة"} الإجابات
-            </Button>
-
-            {showResults && (
-              <div className="text-right space-y-4 mt-4">
-                {examData.questions.map((q, index) => {
-                  if (q.type !== "mcq") return null
-                  const isCorrect = answers[q.id] === q.correctAnswer
-                  return (
-                    <div key={q.id} className={`p-4 rounded-xl border ${isCorrect ? 'bg-chart-3/5 border-chart-3/30' : 'bg-destructive/5 border-destructive/30'}`}>
-                      <p className="font-bold mb-2">{index + 1}. {q.text}</p>
-                      <p className="text-sm">
-                        <span className="text-muted-foreground">إجابتك: </span>
-                        <span className={isCorrect ? 'text-chart-3' : 'text-destructive'}>
-                          {(q.options ?? [])[answers[q.id] as number] ?? "لم تجب"}
-                        </span>
-                      </p>
-                      {!isCorrect && (
-                        <p className="text-sm">
-                          <span className="text-muted-foreground">الإجابة الصحيحة: </span>
-                          <span className="text-chart-3">{(q.options ?? [])[q.correctAnswer ?? 0]}</span>
+              {showReview && exam && (
+                <div className="text-right space-y-3">
+                  {exam.questions.map((q, idx) => {
+                    if (q.question_type !== "mcq") return null
+                    const selectedChoiceId = answers[q.id]
+                    const selectedChoice = q.choices.find(c => c.id === selectedChoiceId)
+                    return (
+                      <div key={q.id} className="p-4 rounded-xl border border-border bg-muted/30">
+                        <p className="font-bold mb-2 text-sm">{idx + 1}. {q.text}</p>
+                        <p className="text-sm text-muted-foreground">
+                          إجابتك: <span className="text-foreground">{selectedChoice?.text || "لم تجب"}</span>
                         </p>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
-            <Button 
-              asChild
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              <Link href={`/dashboard/courses/${examData.courseId}`}>
-                العودة للكورس
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+              <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Link href="/dashboard/courses">العودة للكورسات</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+
+    // النتيجة مش فورية
+    return (
+      <div className="max-w-2xl mx-auto text-center py-16">
+        <CheckCircle className="w-16 h-16 text-chart-3 mx-auto mb-4" />
+        <h2 className="text-2xl font-extrabold mb-2">تم تسليم الاختبار!</h2>
+        <p className="text-muted-foreground mb-8">النتيجة هتظهر بعد مراجعة المدرس</p>
+        <Button asChild variant="outline">
+          <Link href="/dashboard/courses">
+            <ArrowRight className="w-4 h-4 ml-2" />
+            العودة للكورسات
+          </Link>
+        </Button>
       </div>
     )
   }
 
-  // Taking Exam Screen
-  const question = examData.questions[currentQuestion]
+  // ====== Taking Exam ======
+  if (!exam) return null
+  const question = exam.questions[currentQuestion]
   const answeredCount = Object.keys(answers).length
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Timer Bar */}
+      {/* شريط التايمر */}
       <div className="sticky top-0 z-10 bg-background border-b border-border p-4 mb-6 -mx-4 lg:-mx-8 px-4 lg:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className={`w-5 h-5 ${timeLeft < 60 ? 'text-destructive animate-pulse' : 'text-chart-4'}`} />
-            <span className={`font-mono font-bold text-lg ${timeLeft < 60 ? 'text-destructive' : ''}`}>
+            <Clock className={`w-5 h-5 ${timeLeft < 60 ? "text-destructive animate-pulse" : "text-chart-4"}`} />
+            <span className={`font-mono font-bold text-lg ${timeLeft < 60 ? "text-destructive" : ""}`}>
               {formatTime(timeLeft)}
             </span>
           </div>
-          <div className="text-sm text-muted-foreground">
-            {answeredCount} / {examData.questions.length} سؤال
-          </div>
+          <span className="text-sm text-muted-foreground">
+            {answeredCount} / {exam.questions.length} سؤال
+          </span>
         </div>
       </div>
 
-      {/* Question Navigator */}
+      {/* نافيجيتور الأسئلة */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {examData.questions.map((q, index) => (
+        {exam.questions.map((q, index) => (
           <button
             key={q.id}
             onClick={() => setCurrentQuestion(index)}
             className={`w-10 h-10 rounded-lg font-bold text-sm transition-colors ${
-              currentQuestion === index 
-                ? 'bg-primary text-primary-foreground'
-                : answers[q.id] !== undefined
-                  ? 'bg-chart-3 text-white'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              currentQuestion === index
+                ? "bg-primary text-primary-foreground"
+                : answers[q.id]
+                  ? "bg-chart-3 text-white"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
           >
             {index + 1}
@@ -297,69 +426,65 @@ export default function ExamPage() {
         ))}
       </div>
 
-      {/* Question Card */}
+      {/* السؤال */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
-              السؤال {currentQuestion + 1} من {examData.questions.length}
+              السؤال {currentQuestion + 1} من {exam.questions.length}
             </span>
             <span className="text-xs px-2 py-1 bg-muted rounded-full">
-              {question.type === "mcq" ? "اختيار من متعدد" : "مقالي"}
+              {question.question_type === "mcq" ? "اختيار من متعدد" : "مقالي"}
             </span>
           </div>
           <CardTitle className="text-lg font-bold mt-2">{question.text}</CardTitle>
         </CardHeader>
         <CardContent>
-          {question.type === "mcq" && question.options && (
+          {question.question_type === "mcq" && question.choices.length > 0 && (
             <RadioGroup
-              value={answers[question.id]?.toString() || ""}
-              onValueChange={(value) => handleAnswer(question.id, parseInt(value))}
+              value={answers[question.id] || ""}
+              onValueChange={(val) => handleAnswer(question.id, val)}
               className="space-y-3"
             >
-              {question.options.map((option, index) => (
-                <div key={index} className="flex items-center">
-                  <RadioGroupItem 
-                    value={index.toString()} 
-                    id={`option-${index}`}
-                    className="ml-3"
-                  />
-                  <Label 
-                    htmlFor={`option-${index}`}
+              {question.choices.map((choice) => (
+                <div key={choice.id} className="flex items-center">
+                  <RadioGroupItem value={choice.id} id={`choice-${choice.id}`} className="ml-3" />
+                  <Label
+                    htmlFor={`choice-${choice.id}`}
                     className="flex-1 p-4 border border-border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
                   >
-                    {option}
+                    {choice.text}
                   </Label>
                 </div>
               ))}
             </RadioGroup>
           )}
 
-          {question.type === "essay" && (
+          {question.question_type === "essay" && (
             <Textarea
               placeholder="اكتب إجابتك هنا..."
-              value={(answers[question.id] as string) || ""}
+              value={answers[question.id] || ""}
               onChange={(e) => handleAnswer(question.id, e.target.value)}
-              className="min-h-37.5"
+              className="min-h-40"
             />
           )}
         </CardContent>
       </Card>
 
-      {/* Navigation */}
+      {/* التنقل */}
       <div className="flex items-center justify-between mt-6">
         <Button
           variant="outline"
           disabled={currentQuestion === 0}
-          onClick={() => setCurrentQuestion((prev) => prev - 1)}
+          onClick={() => setCurrentQuestion(prev => prev - 1)}
         >
           <ChevronRight className="w-4 h-4 ml-2" />
           السابق
         </Button>
 
-        {currentQuestion < examData.questions.length - 1 ? (
+        {currentQuestion < exam.questions.length - 1 ? (
           <Button
-            onClick={() => setCurrentQuestion((prev) => prev + 1)}
+            onClick={() => setCurrentQuestion(prev => prev + 1)}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             التالي
@@ -368,9 +493,10 @@ export default function ExamPage() {
         ) : (
           <Button
             onClick={handleSubmit}
+            disabled={examState === "submitting"}
             className="bg-chart-3 hover:bg-chart-3/90 text-white"
           >
-            إنهاء الاختبار
+            {examState === "submitting" ? "جاري التسليم..." : "إنهاء الاختبار"}
           </Button>
         )}
       </div>
