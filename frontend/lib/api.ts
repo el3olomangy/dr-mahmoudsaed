@@ -218,3 +218,30 @@ export const usersAPI = {
   deleteStudent: (id: string) =>
     request(`/users/${id}`, { method: "DELETE" }),
 };
+// ====== Stats ======
+export const statsAPI = {
+  getOverview: () => request("/stats/overview"),
+  getTopCourses: () => request("/stats/top-courses"),
+  getRecentStudents: () => request("/stats/recent-students"),
+  getExamStats: (examId: string) => request(`/stats/exam/${examId}`),
+};
+// ====== Assignments ======
+export const assignmentsAPI = {
+  create: (data: object) =>
+    request("/assignments/", { method: "POST", body: JSON.stringify(data) }),
+  getByLecture: (lectureId: string) =>
+    request(`/assignments/lecture/${lectureId}`),
+  getByCourse: (courseId: string) =>
+    request(`/assignments/course/${courseId}`),
+  submit: (data: object) =>
+    request("/assignments/submit", { method: "POST", body: JSON.stringify(data) }),
+  getSubmissions: (assignmentId: string) =>
+    request(`/assignments/${assignmentId}/submissions`),
+  gradeSubmission: (submissionId: string, data: object) =>
+    request(`/assignments/submissions/${submissionId}/grade`, { method: "PATCH", body: JSON.stringify(data) }),
+  getMySubmissions: () =>
+    request("/assignments/my-submissions"),
+  delete: (id: string) =>
+    request(`/assignments/${id}`, { method: "DELETE" }),
+  getResults: (examId: string) => request(`/exams/results/${examId}`),
+};

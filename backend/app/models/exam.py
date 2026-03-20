@@ -9,6 +9,14 @@ def exam_doc(data, questions_docs: list) -> dict:
             scheduled_at = datetime.fromisoformat(data.scheduled_at.replace("Z", "+00:00"))
         except Exception:
             scheduled_at = None
+
+    deadline = None
+    if getattr(data, "deadline", None):
+        try:
+            deadline = datetime.fromisoformat(data.deadline.replace("Z", "+00:00"))
+        except Exception:
+            deadline = None
+
     return {
         "title": data.title,
         "lecture_id": data.lecture_id,
@@ -17,6 +25,8 @@ def exam_doc(data, questions_docs: list) -> dict:
         "pass_score": data.pass_score,
         "show_result_immediately": data.show_result_immediately,
         "scheduled_at": scheduled_at,
+        "deadline": deadline,
+        "is_homework": getattr(data, "is_homework", False),
         "questions": questions_docs,
         "is_published": True,
         "created_at": datetime.now(timezone.utc),

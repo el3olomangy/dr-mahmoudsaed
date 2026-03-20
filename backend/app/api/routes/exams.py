@@ -52,6 +52,14 @@ async def submit_exam(data: ExamSubmit, current_user=Depends(get_current_user), 
     if existing:
         raise HTTPException(status_code=400, detail="عملت الاختبار ده قبل كده")
 
+    # تحقق من الـ deadline لو الواجب
+    if exam.get("is_homework") and exam.get("deadline"):
+        deadline = exam["deadline"]
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > deadline:
+            raise HTTPException(status_code=400, detail="انتهى موعد تسليم الواجب")
+
     total_points = sum(q["points"] for q in exam["questions"])
     earned_points = 0
     answers_log = []
@@ -112,6 +120,8 @@ async def get_course_exams(course_id: str, current_user=Depends(get_current_user
         "lecture_id": e.get("lecture_id"),
         "pass_score": e.get("pass_score", 50),
         "scheduled_at": e.get("scheduled_at"),
+        "is_homework": e.get("is_homework", False),
+        "deadline": e.get("deadline"),
     } for e in exams]
 
 
@@ -130,7 +140,6 @@ async def get_exam_results(exam_id: str, current_user=Depends(get_current_teache
 
 @router.get("/review/{exam_id}")
 async def get_exam_for_review(exam_id: str, current_user=Depends(get_current_teacher), db=Depends(get_db)):
-    """جيب الاختبار مع كل إجابات الطلاب المقالية"""
     oid = validate_object_id(exam_id)
     exam = await db.exams.find_one({"_id": oid})
     if not exam:
@@ -193,7 +202,6 @@ class ReviewSubmit(BaseModel):
 
 @router.post("/review")
 async def submit_essay_review(data: ReviewSubmit, current_user=Depends(get_current_teacher), db=Depends(get_db)):
-    """المدرس يسلم تصحيح الأسئلة المقالية"""
     result = await db.exam_results.find_one({"_id": ObjectId(data.result_id)})
     if not result:
         raise HTTPException(status_code=404, detail="نتيجة الطالب مش موجودة")
@@ -221,7 +229,6 @@ async def submit_essay_review(data: ReviewSubmit, current_user=Depends(get_curre
             essay_earned += pts
         updated_answers.append(ans)
 
-    # أعد احتساب الدرجة: MCQ ثابتة + مقالي جديد
     old_essay_earned = sum(
         a.get("essay_earned_points", 0)
         for a in result["answers"]
@@ -247,10 +254,9 @@ async def submit_essay_review(data: ReviewSubmit, current_user=Depends(get_curre
         }}
     )
 
-    # إشعار للطالب إن التصحيح اتعمل
     await db.notifications.insert_one({
         "title": f"تم تصحيح اختبار: {exam['title']}",
-        "body": f"درجتك النهائية: {round(new_score)}% — {'ناجح \u2713' if new_passed else 'لم تنجح'}. ادخل الاختبار عشان تشوف التفاصيل.",
+        "body": f"درجتك النهائية: {round(new_score)}% — {'ناجح ✓' if new_passed else 'لم تنجح'}. ادخل الاختبار عشان تشوف التفاصيل.",
         "notification_type": "exam_reviewed",
         "target_user_id": result["student_id"],
         "target_grade": None,
@@ -280,7 +286,6 @@ async def get_my_result(exam_id: str, current_user=Depends(get_current_user), db
     if exam:
         questions_map = {str(q["_id"]): q for q in exam["questions"]}
 
-    # ضيف تصحيح المقالي للطالب
     essay_reviews = []
     for ans in result.get("answers", []):
         q = questions_map.get(ans["question_id"])
@@ -293,17 +298,15 @@ async def get_my_result(exam_id: str, current_user=Depends(get_current_user), db
                 "teacher_comment": ans.get("teacher_comment", ""),
             })
 
-    # إجابات MCQ مع الصح والغلط
     mcq_reviews = []
     for ans in result.get("answers", []):
         q = questions_map.get(ans["question_id"])
         if not q or q["question_type"] != "mcq":
             continue
-        selected_raw = ans.get("selected_choice")  # ممكن يكون index أو نص
+        selected_raw = ans.get("selected_choice")
         choices = q.get("choices", [])
         selected_text = None
         if selected_raw is not None:
-            # حاول تحويله كـ index رقمي
             try:
                 idx = int(selected_raw)
                 if 0 <= idx < len(choices):
@@ -311,7 +314,6 @@ async def get_my_result(exam_id: str, current_user=Depends(get_current_user), db
                 else:
                     selected_text = selected_raw
             except (ValueError, TypeError):
-                # مش رقم — ابحث عنه كنص مباشرة
                 match = next((c["text"] for c in choices if c["text"] == selected_raw), None)
                 selected_text = match or selected_raw
         correct_choice = next((c for c in choices if c.get("is_correct")), None)
@@ -436,7 +438,6 @@ async def full_update_exam(exam_id: str, data: ExamFullUpdate, current_user=Depe
 
     await db.exams.update_one({"_id": oid}, {"$set": update_data})
 
-    # لو الأسئلة اتغيرت — امسح نتايج الطلاب القديمة عشان يعيدوا الاختبار
     deleted_results = 0
     if questions_changed:
         result = await db.exam_results.delete_many({"exam_id": exam_id})
@@ -476,6 +477,8 @@ async def get_exam_for_admin(exam_id: str, current_user=Depends(get_current_teac
         "pass_score": exam.get("pass_score", 50),
         "show_result_immediately": exam.get("show_result_immediately", True),
         "scheduled_at": exam.get("scheduled_at"),
+        "is_homework": exam.get("is_homework", False),
+        "deadline": exam.get("deadline"),
         "questions": [{
             "id": str(q["_id"]),
             "text": q["text"],
@@ -510,5 +513,7 @@ async def get_exam(exam_id: str, current_user=Depends(get_current_user), db=Depe
         "title": exam["title"],
         "duration_minutes": exam["duration_minutes"],
         "scheduled_at": exam.get("scheduled_at"),
+        "is_homework": exam.get("is_homework", False),
+        "deadline": exam.get("deadline"),
         "questions": [question_helper(q) for q in exam.get("questions", [])],
     }

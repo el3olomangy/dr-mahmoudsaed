@@ -46,3 +46,15 @@ class ExamResult(BaseModel):
     earned_points: int
     submitted_at: datetime
     answers: List[dict] = []
+
+class ExamCreate(BaseModel):
+    title: str = Field(..., min_length=3)
+    lecture_id: Optional[str] = None
+    course_id: str
+    duration_minutes: int = Field(default=30, ge=5)
+    pass_score: int = Field(default=50, ge=0, le=100)
+    show_result_immediately: bool = True
+    scheduled_at: Optional[str] = None
+    questions: List[QuestionCreate] = []
+    is_homework: bool = False
+    deadline: Optional[str] = None

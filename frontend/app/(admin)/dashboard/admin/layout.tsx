@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ClipboardList,
   FileText,
+  ClipboardCheck,
 } from "lucide-react"
 
 const menuItems = [
@@ -26,6 +27,7 @@ const menuItems = [
   { href: "/dashboard/admin/courses", label: "الكورسات", icon: BookOpen },
   { href: "/dashboard/admin/exams", label: "الاختبارات", icon: ClipboardList, exact: true },
   { href: "/dashboard/admin/exams/review", label: "تصحيح المقالي", icon: FileText, exact: true },
+  { href: "/dashboard/admin/assignments", label: "الواجبات", icon: ClipboardCheck },
   { href: "/dashboard/admin/notifications", label: "الإشعارات", icon: Bell },
   { href: "/dashboard/admin/codes", label: "الأكواد", icon: KeyRound },
 ]

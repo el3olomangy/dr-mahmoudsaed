@@ -6,12 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  FileCheck,
-  AlertCircle,
+  ArrowRight, ChevronLeft, ChevronRight,
+  FileText, FileCheck, AlertCircle, ClipboardCheck, Calendar,
 } from "lucide-react"
 import { coursesAPI, examsAPI, progressAPI } from "@/lib/api"
 import VideoPlayer from "@/components/VideoPlayer"
@@ -40,6 +36,8 @@ interface ExamInfo {
   id: string
   title: string
   duration_minutes: number
+  is_homework?: boolean
+  deadline?: string
 }
 
 export default function WatchPage({ params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +51,7 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
   const [prevLectureId, setPrevLectureId] = useState<string | null>(null)
   const [nextLectureId, setNextLectureId] = useState<string | null>(null)
   const [exam, setExam] = useState<ExamInfo | null>(null)
+  const [homework, setHomework] = useState<ExamInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
   const [initialPosition, setInitialPosition] = useState(0)
@@ -86,10 +85,8 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
             setCourseName(fullCourse.title)
             setUnitName(foundUnit?.title || "")
 
-            // سجّل إن الطالب شاف المحاضرة دي
             progressAPI.markWatched(lectureId).catch(() => {})
 
-            // جيب آخر موقف للطالب
             progressAPI.getPosition(lectureId).then((pos: any) => {
               if (pos.last_position && pos.last_position > 5) {
                 setSavedPosition(pos.last_position)
@@ -101,10 +98,17 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
             setPrevLectureId(idx > 0 ? allLectures[idx - 1].id : null)
             setNextLectureId(idx < allLectures.length - 1 ? allLectures[idx + 1].id : null)
 
+            // جيب كل الاختبارات والواجبات للكورس
             try {
-              const exams = await examsAPI.getByCourse(course.id) as any[]
-              const lectureExam = exams.find((e: any) => e.lecture_id === lectureId)
-              if (lectureExam) setExam(lectureExam)
+              const allExams = await examsAPI.getByCourse(course.id) as any[]
+              const lectureExams = allExams.filter((e: any) => e.lecture_id === lectureId)
+
+              // افصل الاختبارات عن الواجبات
+              const normalExam = lectureExams.find((e: any) => !e.is_homework)
+              const homeworkExam = lectureExams.find((e: any) => e.is_homework === true)
+
+              if (normalExam) setExam(normalExam)
+              if (homeworkExam) setHomework(homeworkExam)
             } catch {}
 
             break
@@ -167,6 +171,7 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
 
   return (
     <div className="space-y-6">
+
       {/* Resume Dialog */}
       {showResumeDialog && savedPosition > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -197,6 +202,7 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
           </div>
         </div>
       )}
+
       <Link
         href={courseId ? `/dashboard/courses/${courseId}` : "/dashboard/courses"}
         className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -223,96 +229,100 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
               {unitName && <> &bull; {unitName}</>}
               {lecture.duration_minutes && <> &bull; {lecture.duration_minutes} دقيقة</>}
             </p>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">
-              {lecture.title}
-            </h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{lecture.title}</h1>
             {lecture.description && (
               <p className="text-muted-foreground mt-2 text-sm">{lecture.description}</p>
             )}
           </div>
 
           <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              disabled={!prevLectureId}
-              asChild={!!prevLectureId}
-            >
+            <Button variant="outline" disabled={!prevLectureId} asChild={!!prevLectureId}>
               {prevLectureId ? (
                 <Link href={`/dashboard/watch/${prevLectureId}`} className="flex items-center gap-2">
-                  <ChevronRight className="w-4 h-4" />
-                  المحاضرة السابقة
+                  <ChevronRight className="w-4 h-4" />المحاضرة السابقة
                 </Link>
               ) : (
-                <span className="flex items-center gap-2">
-                  <ChevronRight className="w-4 h-4" />
-                  المحاضرة السابقة
-                </span>
+                <span className="flex items-center gap-2"><ChevronRight className="w-4 h-4" />المحاضرة السابقة</span>
               )}
             </Button>
 
-            <Button
-              disabled={!nextLectureId}
-              asChild={!!nextLectureId}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
+            <Button disabled={!nextLectureId} asChild={!!nextLectureId} className="bg-primary hover:bg-primary/90 text-primary-foreground">
               {nextLectureId ? (
                 <Link href={`/dashboard/watch/${nextLectureId}`} className="flex items-center gap-2">
-                  المحاضرة التالية
-                  <ChevronLeft className="w-4 h-4" />
+                  المحاضرة التالية<ChevronLeft className="w-4 h-4" />
                 </Link>
               ) : (
-                <span className="flex items-center gap-2">
-                  المحاضرة التالية
-                  <ChevronLeft className="w-4 h-4" />
-                </span>
+                <span className="flex items-center gap-2">المحاضرة التالية<ChevronLeft className="w-4 h-4" /></span>
               )}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {(lecture.pdf_url || exam) && (
-        <div className="grid md:grid-cols-2 gap-4">
-          {lecture.pdf_url && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-secondary" />
-                  ملف الشرح
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Button asChild variant="outline" className="w-full">
-                  <a href={lecture.pdf_url} target="_blank" rel="noopener noreferrer">
-                    عرض الملف
-                  </a>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+      {/* PDF + اختبار + واجب */}
+      <div className="grid md:grid-cols-2 gap-4">
 
-          {exam && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileCheck className="w-5 h-5 text-chart-4" />
-                  اختبار المحاضرة
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-sm mb-4">
-                  {exam.title} &bull; {exam.duration_minutes} دقيقة
+        {lecture.pdf_url && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="w-5 h-5 text-secondary" />
+                ملف الشرح
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <a href={lecture.pdf_url} target="_blank" rel="noopener noreferrer">
+                  عرض الملف
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {exam && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-chart-4" />
+                اختبار المحاضرة
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-sm mb-4">
+                {exam.title} &bull; {exam.duration_minutes} دقيقة
+              </p>
+              <Button asChild className="w-full bg-chart-4 hover:bg-chart-4/90 text-white">
+                <Link href={`/dashboard/exam/${exam.id}`}>ابدأ الاختبار</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {homework && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ClipboardCheck className="w-5 h-5 text-primary" />
+                واجب المحاضرة
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-muted-foreground text-sm">{homework.title}</p>
+              {homework.deadline && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  آخر موعد: {new Date(homework.deadline).toLocaleDateString("ar-EG", { dateStyle: "full" })}
                 </p>
-                <Button asChild className="w-full bg-chart-4 hover:bg-chart-4/90 text-white">
-                  <Link href={`/dashboard/exam/${exam.id}`}>
-                    ابدأ الاختبار
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+              )}
+              <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Link href={`/dashboard/exam/${homework.id}`}>ابدأ الواجب</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+      </div>
     </div>
   )
 }
