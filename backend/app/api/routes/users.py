@@ -92,6 +92,30 @@ async def get_student_by_parent(parent_phone: str, db=Depends(get_db)):
     }
 
 
+# ====== تسجيل خروج إجباري ======
+
+@router.post("/{student_id}/force-logout")
+async def force_logout_student(
+    student_id: str,
+    current_user=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    from bson import ObjectId
+    from datetime import datetime, timezone
+    oid = ObjectId(student_id) if ObjectId.is_valid(student_id) else None
+    if not oid:
+        raise HTTPException(status_code=422, detail="ID غير صالح")
+    student = await db.users.find_one({"_id": oid})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب مش موجود")
+    # حدّث force_logout_at — كل التوكنات اللي اتعملت قبله هتبقى منتهية
+    await db.users.update_one(
+        {"_id": oid},
+        {"$set": {"force_logout_at": datetime.now(timezone.utc)}}
+    )
+    return {"message": f"تم تسجيل خروج {student['first_name']} {student['last_name']} من كل الأجهزة"}
+
+
 # ====== إنشاء مساعد (المدرس فقط) ======
 
 @router.post("/assistants", status_code=201)

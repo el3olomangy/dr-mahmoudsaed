@@ -1,29 +1,64 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Phone, Lock, User, ArrowLeft, MapPin, GraduationCap } from "lucide-react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { authAPI } from "@/lib/api"
+import Link from "next/link";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Phone,
+  Lock,
+  User,
+  ArrowLeft,
+  MapPin,
+  GraduationCap,
+} from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { authAPI } from "@/lib/api";
 
 const governorates = [
-  "القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "البحيرة", "الشرقية",
-  "المنوفية", "القليوبية", "كفر الشيخ", "الغربية", "دمياط", "بورسعيد",
-  "الإسماعيلية", "السويس", "الفيوم", "بني سويف", "المنيا", "أسيوط",
-  "سوهاج", "قنا", "الأقصر", "أسوان", "البحر الأحمر", "الوادي الجديد",
-  "مطروح", "شمال سيناء", "جنوب سيناء"
-]
+  "القاهرة",
+  "الجيزة",
+  "الإسكندرية",
+  "الدقهلية",
+  "البحيرة",
+  "الشرقية",
+  "المنوفية",
+  "القليوبية",
+  "كفر الشيخ",
+  "الغربية",
+  "دمياط",
+  "بورسعيد",
+  "الإسماعيلية",
+  "السويس",
+  "الفيوم",
+  "بني سويف",
+  "المنيا",
+  "أسيوط",
+  "سوهاج",
+  "قنا",
+  "الأقصر",
+  "أسوان",
+  "البحر الأحمر",
+  "الوادي الجديد",
+  "مطروح",
+  "شمال سيناء",
+  "جنوب سيناء",
+];
 
 const grades = [
   { value: "first_secondary", label: "الصف الأول الثانوي" },
   { value: "second_secondary", label: "الصف الثاني الثانوي" },
   { value: "third_secondary", label: "الصف الثالث الثانوي" },
-]
+];
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -36,30 +71,30 @@ export default function RegisterPage() {
     gender: "",
     grade: "",
     governorate: "",
-  })
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
-  const router = useRouter()
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   const handleChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }))
-  }
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
+    e.preventDefault();
+    setError("");
 
     if (formData.password !== formData.confirmPassword) {
-      setError("كلمة المرور غير متطابقة")
-      return
+      setError("كلمة المرور غير متطابقة");
+      return;
     }
 
     if (!formData.gender || !formData.grade || !formData.governorate) {
-      setError("من فضلك اختر النوع والمرحلة والمحافظة")
-      return
+      setError("من فضلك اختر النوع والمرحلة والمحافظة");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       await authAPI.register({
         first_name: formData.firstName,
@@ -70,14 +105,14 @@ export default function RegisterPage() {
         gender: formData.gender,
         grade: formData.grade,
         governorate: formData.governorate,
-      })
-      router.push("/login?registered=true")
+      });
+      router.push("/login?registered=true");
     } catch (err: any) {
-      setError(err.message || "حصل خطأ — حاول تاني")
+      setError(err.message || "حصل خطأ — حاول تاني");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -95,8 +130,12 @@ export default function RegisterPage() {
           </Link>
 
           <div className="mb-8">
-            <h1 className="text-3xl font-extrabold text-foreground">إنشاء حساب جديد</h1>
-            <p className="mt-2 text-muted-foreground">سجل معانا وابدأ رحلة التفوق</p>
+            <h1 className="text-3xl font-extrabold text-foreground">
+              إنشاء حساب جديد
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              سجل معانا وابدأ رحلة التفوق
+            </p>
           </div>
 
           {error && (
@@ -113,7 +152,7 @@ export default function RegisterPage() {
                   <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     id="firstName"
-                    placeholder="محمد"
+                    placeholder="احمد"
                     value={formData.firstName}
                     onChange={(e) => handleChange("firstName", e.target.value)}
                     className="pr-10"
@@ -125,7 +164,7 @@ export default function RegisterPage() {
                 <Label htmlFor="lastName">الاسم الأخير</Label>
                 <Input
                   id="lastName"
-                  placeholder="أحمد"
+                  placeholder="السعيد"
                   value={formData.lastName}
                   onChange={(e) => handleChange("lastName", e.target.value)}
                   required
@@ -159,7 +198,9 @@ export default function RegisterPage() {
                     type="tel"
                     placeholder="01xxxxxxxxx"
                     value={formData.parentPhone}
-                    onChange={(e) => handleChange("parentPhone", e.target.value)}
+                    onChange={(e) =>
+                      handleChange("parentPhone", e.target.value)
+                    }
                     className="pr-10 text-left"
                     dir="ltr"
                     required
@@ -171,7 +212,10 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>النوع</Label>
-                <Select value={formData.gender} onValueChange={(v) => handleChange("gender", v)}>
+                <Select
+                  value={formData.gender}
+                  onValueChange={(v) => handleChange("gender", v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر النوع" />
                   </SelectTrigger>
@@ -183,7 +227,10 @@ export default function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <Label>المرحلة الدراسية</Label>
-                <Select value={formData.grade} onValueChange={(v) => handleChange("grade", v)}>
+                <Select
+                  value={formData.grade}
+                  onValueChange={(v) => handleChange("grade", v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر المرحلة" />
                   </SelectTrigger>
@@ -200,13 +247,18 @@ export default function RegisterPage() {
 
             <div className="space-y-2">
               <Label>المحافظة</Label>
-              <Select value={formData.governorate} onValueChange={(v) => handleChange("governorate", v)}>
+              <Select
+                value={formData.governorate}
+                onValueChange={(v) => handleChange("governorate", v)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="اختر المحافظة" />
                 </SelectTrigger>
                 <SelectContent>
                   {governorates.map((gov) => (
-                    <SelectItem key={gov} value={gov}>{gov}</SelectItem>
+                    <SelectItem key={gov} value={gov}>
+                      {gov}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -238,7 +290,9 @@ export default function RegisterPage() {
                     type="password"
                     placeholder="********"
                     value={formData.confirmPassword}
-                    onChange={(e) => handleChange("confirmPassword", e.target.value)}
+                    onChange={(e) =>
+                      handleChange("confirmPassword", e.target.value)
+                    }
                     className="pr-10"
                     required
                     minLength={6}
@@ -258,7 +312,10 @@ export default function RegisterPage() {
 
           <p className="mt-8 text-center text-muted-foreground">
             عندك حساب بالفعل؟{" "}
-            <Link href="/login" className="text-primary font-bold hover:underline">
+            <Link
+              href="/login"
+              className="text-primary font-bold hover:underline"
+            >
               سجل دخول
             </Link>
           </p>
@@ -281,10 +338,14 @@ export default function RegisterPage() {
               className="object-contain"
             />
           </div>
-          <h2 className="text-3xl font-extrabold text-white mb-4">انضم لمجتمع العلومنجي</h2>
-          <p className="text-white/80 text-lg max-w-sm mx-auto">ابدأ رحلة التفوق الدراسي معانا النهاردة</p>
+          <h2 className="text-3xl font-extrabold text-white mb-4">
+            انضم لمجتمع العلومنجي
+          </h2>
+          <p className="text-white/80 text-lg max-w-sm mx-auto">
+            ابدأ رحلة التفوق الدراسي معانا النهاردة
+          </p>
         </div>
       </div>
     </div>
-  )
+  );
 }

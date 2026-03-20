@@ -193,6 +193,13 @@ export const progressAPI = {
     request(`/progress/course/${courseId}`),
   getStudentCourseProgress: (studentId: string, courseId: string) =>
     request(`/progress/student/${studentId}/course/${courseId}`),
+  savePosition: (lectureId: string, position: number, duration: number) =>
+    request(`/progress/lecture/${lectureId}/position`, {
+      method: "POST",
+      body: JSON.stringify({ position, duration }),
+    }),
+  getPosition: (lectureId: string) =>
+    request(`/progress/lecture/${lectureId}/position`),
 };
 
 // ====== Users ======

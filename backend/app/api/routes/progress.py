@@ -1,10 +1,61 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from datetime import datetime, timezone
 from bson import ObjectId
 from ...core.database import get_db
 from ...core.dependencies import get_current_user, get_current_teacher_or_assistant
 
 router = APIRouter(prefix="/progress", tags=["Progress"])
+
+
+class VideoPosition(BaseModel):
+    position: float  # بالثواني
+    duration: float = 0  # مدة الفيديو الكاملة
+
+
+@router.post("/lecture/{lecture_id}/position")
+async def save_video_position(
+    lecture_id: str,
+    data: VideoPosition,
+    current_user=Depends(get_current_user),
+    db=Depends(get_db)
+):
+    """حفظ آخر موقف وصله الطالب في الفيديو"""
+    user_id = str(current_user["_id"])
+    watched = data.duration > 0 and (data.position / data.duration) >= 0.9
+    await db.lecture_progress.update_one(
+        {"user_id": user_id, "lecture_id": lecture_id},
+        {"$set": {
+            "user_id": user_id,
+            "lecture_id": lecture_id,
+            "last_position": data.position,
+            "duration": data.duration,
+            "watched": watched,
+            "updated_at": datetime.now(timezone.utc),
+        }},
+        upsert=True,
+    )
+    return {"message": "تم حفظ الموقف"}
+
+
+@router.get("/lecture/{lecture_id}/position")
+async def get_video_position(
+    lecture_id: str,
+    current_user=Depends(get_current_user),
+    db=Depends(get_db)
+):
+    """جيب آخر موقف للطالب في الفيديو"""
+    user_id = str(current_user["_id"])
+    doc = await db.lecture_progress.find_one(
+        {"user_id": user_id, "lecture_id": lecture_id}
+    )
+    if not doc:
+        return {"last_position": 0, "duration": 0, "watched": False}
+    return {
+        "last_position": doc.get("last_position", 0),
+        "duration": doc.get("duration", 0),
+        "watched": doc.get("watched", False),
+    }
 
 
 @router.post("/lecture/{lecture_id}")

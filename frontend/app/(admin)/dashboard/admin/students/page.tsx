@@ -19,6 +19,7 @@ import {
   BookOpen,
   PlayCircle,
   FileCheck,
+  LogOut,
 } from "lucide-react";
 import { usersAPI, progressAPI, coursesAPI } from "@/lib/api";
 
@@ -47,22 +48,15 @@ export default function StudentsPage() {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [courseNames, setCourseNames] = useState<Record<string, string>>({});
-  const [studentProgress, setStudentProgress] = useState<Record<string, any>>(
-    {},
-  );
+  const [studentProgress, setStudentProgress] = useState<Record<string, any>>({});
 
   useEffect(() => {
     fetchStudents();
-    coursesAPI
-      .getAll()
-      .then((data: any) => {
-        const names: Record<string, string> = {};
-        data.forEach((c: any) => {
-          names[c.id] = c.title;
-        });
-        setCourseNames(names);
-      })
-      .catch(() => {});
+    coursesAPI.getAll().then((data: any) => {
+      const names: Record<string, string> = {};
+      data.forEach((c: any) => { names[c.id] = c.title; });
+      setCourseNames(names);
+    }).catch(() => {});
   }, []);
 
   const fetchStudents = async () => {
@@ -99,6 +93,19 @@ export default function StudentsPage() {
     try {
       await usersAPI.resetDevice(id);
       alert("تم reset الجهاز بنجاح");
+    } catch (err: any) {
+      alert(err.message || "حصل خطأ");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleForceLogout = async (id: string, name: string) => {
+    if (!confirm(`هتسجل خروج ${name} من كل أجهزته فوراً. متأكد؟`)) return;
+    setLoadingAction(`logout-${id}`);
+    try {
+      const res: any = await usersAPI.forceLogout(id);
+      alert(res.message || "تم تسجيل الخروج الإجباري");
     } catch (err: any) {
       alert(err.message || "حصل خطأ");
     } finally {
@@ -269,29 +276,17 @@ export default function StudentsPage() {
                         size="sm"
                         variant="ghost"
                         onClick={() => {
-                          const newId =
-                            expandedId === student.id ? null : student.id;
+                          const newId = expandedId === student.id ? null : student.id;
                           setExpandedId(newId);
                           if (newId && student.enrolled_courses.length > 0) {
-                            student.enrolled_courses.forEach(
-                              (courseId: string) => {
-                                const key = `${student.id}_${courseId}`;
-                                if (!studentProgress[key]) {
-                                  progressAPI
-                                    .getStudentCourseProgress(
-                                      student.id,
-                                      courseId,
-                                    )
-                                    .then((p: any) =>
-                                      setStudentProgress((prev) => ({
-                                        ...prev,
-                                        [key]: p,
-                                      })),
-                                    )
-                                    .catch(() => {});
-                                }
-                              },
-                            );
+                            student.enrolled_courses.forEach((courseId: string) => {
+                              const key = `${student.id}_${courseId}`;
+                              if (!studentProgress[key]) {
+                                progressAPI.getStudentCourseProgress(student.id, courseId)
+                                  .then((p: any) => setStudentProgress(prev => ({ ...prev, [key]: p })))
+                                  .catch(() => {});
+                              }
+                            });
                           }
                         }}
                       >
@@ -338,35 +333,22 @@ export default function StudentsPage() {
                       {/* تقدم الطالب في الكورسات */}
                       {student.enrolled_courses.length > 0 && (
                         <div className="mt-4 space-y-2">
-                          <p className="text-xs font-bold text-muted-foreground">
-                            تقدم الطالب
-                          </p>
+                          <p className="text-xs font-bold text-muted-foreground">تقدم الطالب</p>
                           {student.enrolled_courses.map((courseId: string) => {
                             const key = `${student.id}_${courseId}`;
                             const p = studentProgress[key];
-                            const courseName =
-                              courseNames[courseId] || courseId;
+                            const courseName = courseNames[courseId] || courseId;
                             return (
-                              <div
-                                key={courseId}
-                                className="bg-background border border-border rounded-xl p-3"
-                              >
+                              <div key={courseId} className="bg-background border border-border rounded-xl p-3">
                                 <div className="flex items-center justify-between mb-1.5">
                                   <p className="text-xs font-medium text-foreground flex items-center gap-1 truncate max-w-[60%]">
                                     <BookOpen className="w-3 h-3 shrink-0 text-muted-foreground" />
                                     {courseName}
                                   </p>
-                                  <span className="text-xs font-bold text-primary">
-                                    {p ? `${p.percentage}%` : "—"}
-                                  </span>
+                                  <span className="text-xs font-bold text-primary">{p ? `${p.percentage}%` : "—"}</span>
                                 </div>
                                 <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                                  <div
-                                    className="bg-primary h-2 rounded-full transition-all duration-500"
-                                    style={{
-                                      width: p ? `${p.percentage}%` : "0%",
-                                    }}
-                                  />
+                                  <div className="bg-primary h-2 rounded-full transition-all duration-500" style={{ width: p ? `${p.percentage}%` : "0%" }} />
                                 </div>
                                 {p && (
                                   <div className="flex items-center justify-between mt-1.5 text-xs text-muted-foreground">
@@ -376,8 +358,7 @@ export default function StudentsPage() {
                                     </span>
                                     <span className="flex items-center gap-1">
                                       <FileCheck className="w-3 h-3" />
-                                      {p.exam_stats?.passed}/
-                                      {p.exam_stats?.taken} اختبار
+                                      {p.exam_stats?.passed}/{p.exam_stats?.taken} اختبار
                                     </span>
                                   </div>
                                 )}
@@ -387,7 +368,7 @@ export default function StudentsPage() {
                         </div>
                       )}
 
-                      <div className="mt-4">
+                      <div className="mt-4 flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           variant="outline"
@@ -399,6 +380,18 @@ export default function StudentsPage() {
                           {loadingAction === `reset-${student.id}`
                             ? "جاري الـ reset..."
                             : "Reset الجهاز"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-amber-400 text-amber-600 hover:bg-amber-50"
+                          disabled={loadingAction === `logout-${student.id}`}
+                          onClick={() => handleForceLogout(student.id, `${student.first_name} ${student.last_name}`)}
+                        >
+                          <LogOut className="w-4 h-4 ml-2" />
+                          {loadingAction === `logout-${student.id}`
+                            ? "جاري الطرد..."
+                            : "تسجيل خروج إجباري"}
                         </Button>
                         <Button
                           size="sm"

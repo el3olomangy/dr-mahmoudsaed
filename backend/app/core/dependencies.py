@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .security import decode_token
+from datetime import datetime, timezone
 from .database import get_db
 
 security = HTTPBearer()
@@ -29,6 +30,16 @@ async def get_current_user(
 
     if not user.get("is_active"):
         raise HTTPException(status_code=403, detail="الحساب موقوف")
+
+    # تحقق من تسجيل الخروج الإجباري
+    force_logout_at = user.get("force_logout_at")
+    if force_logout_at:
+        token_iat = payload.get("iat")
+        if token_iat:
+            token_time = datetime.fromtimestamp(token_iat, tz=timezone.utc)
+            logout_time = force_logout_at if force_logout_at.tzinfo else force_logout_at.replace(tzinfo=timezone.utc)
+            if token_time < logout_time:
+                raise HTTPException(status_code=401, detail="تم تسجيل خروجك بواسطة المدرس")
 
     return user
 

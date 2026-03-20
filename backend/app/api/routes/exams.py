@@ -293,6 +293,40 @@ async def get_my_result(exam_id: str, current_user=Depends(get_current_user), db
                 "teacher_comment": ans.get("teacher_comment", ""),
             })
 
+    # إجابات MCQ مع الصح والغلط
+    mcq_reviews = []
+    for ans in result.get("answers", []):
+        q = questions_map.get(ans["question_id"])
+        if not q or q["question_type"] != "mcq":
+            continue
+        selected_raw = ans.get("selected_choice")  # ممكن يكون index أو نص
+        choices = q.get("choices", [])
+        selected_text = None
+        if selected_raw is not None:
+            # حاول تحويله كـ index رقمي
+            try:
+                idx = int(selected_raw)
+                if 0 <= idx < len(choices):
+                    selected_text = choices[idx]["text"]
+                else:
+                    selected_text = selected_raw
+            except (ValueError, TypeError):
+                # مش رقم — ابحث عنه كنص مباشرة
+                match = next((c["text"] for c in choices if c["text"] == selected_raw), None)
+                selected_text = match or selected_raw
+        correct_choice = next((c for c in choices if c.get("is_correct")), None)
+        correct_text = correct_choice["text"] if correct_choice else None
+        is_correct = ans.get("is_correct", False)
+        mcq_reviews.append({
+            "question_id": ans["question_id"],
+            "question_text": q["text"],
+            "points": q["points"],
+            "selected_text": selected_text,
+            "correct_text": correct_text,
+            "is_correct": is_correct,
+            "choices": [{"text": c["text"], "is_correct": c.get("is_correct", False)} for c in choices],
+        })
+
     return {
         "score": result["score"],
         "passed": result["passed"],
@@ -301,6 +335,8 @@ async def get_my_result(exam_id: str, current_user=Depends(get_current_user), db
         "submitted_at": result["submitted_at"],
         "essay_fully_reviewed": result.get("essay_fully_reviewed", False),
         "essay_reviews": essay_reviews,
+        "mcq_reviews": mcq_reviews,
+        "answers": result.get("answers", []),
     }
 
 

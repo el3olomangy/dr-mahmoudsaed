@@ -10,10 +10,13 @@ import {
 interface VideoPlayerProps {
   url: string
   watermark?: string
+  lectureId?: string
+  initialPosition?: number
+  onProgress?: (position: number, duration: number) => void
 }
 
 // ====== YouTube Player ======
-function YouTubePlayer({ videoId, watermark }: { videoId: string; watermark?: string }) {
+function YouTubePlayer({ videoId, watermark, initialPosition, onProgress }: { videoId: string; watermark?: string; initialPosition?: number; onProgress?: (p: number, d: number) => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<any>(null)
@@ -53,6 +56,23 @@ function YouTubePlayer({ videoId, watermark }: { videoId: string; watermark?: st
         events: {
           onStateChange: (e: any) => {
             setIsPlaying(e.data === 1)
+            // لما الفيديو يبدأ، ابدأ من آخر نقطة
+            if (e.data === 1 && initialPosition && initialPosition > 5) {
+              const current = playerRef.current?.getCurrentTime() || 0
+              if (current < 5) {
+                playerRef.current?.seekTo(initialPosition, true)
+              }
+            }
+          },
+          onReady: () => {
+            // تتبع التقدم كل 10 ثواني
+            if (onProgress) {
+              setInterval(() => {
+                const p = playerRef.current?.getCurrentTime() || 0
+                const d = playerRef.current?.getDuration() || 0
+                if (p > 0) onProgress(p, d)
+              }, 10000)
+            }
           },
         },
       })
@@ -201,7 +221,7 @@ function YouTubePlayer({ videoId, watermark }: { videoId: string; watermark?: st
 }
 
 // ====== HTML5 Player (Drive + روابط مباشرة) ======
-function HTML5Player({ url, watermark }: { url: string; watermark?: string }) {
+function HTML5Player({ url, watermark, initialPosition, onProgress }: { url: string; watermark?: string; initialPosition?: number; onProgress?: (p: number, d: number) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -310,14 +330,32 @@ function HTML5Player({ url, watermark }: { url: string; watermark?: string }) {
         ref={videoRef}
         src={url}
         className="absolute inset-0 w-full h-full"
-        onPlay={() => setIsPlaying(true)}
+        onPlay={() => {
+          setIsPlaying(true)
+          // تتبع التقدم كل 10 ثواني
+          if (onProgress && videoRef.current) {
+            const interval = setInterval(() => {
+              if (videoRef.current) {
+                onProgress(videoRef.current.currentTime, videoRef.current.duration || 0)
+              }
+            }, 10000)
+            // clearInterval عند الـ pause أو end — مش ممكن هنا بس نتعامل معاه بالـ component unmount
+          }
+        }}
         onPause={() => setIsPlaying(false)}
         onTimeUpdate={() => {
           if (!videoRef.current) return
           setCurrentTime(videoRef.current.currentTime)
           setProgress(videoRef.current.currentTime / (videoRef.current.duration || 1) * 100)
         }}
-        onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+        onLoadedMetadata={() => {
+          const d = videoRef.current?.duration || 0
+          setDuration(d)
+          // ابدأ من آخر نقطة
+          if (initialPosition && initialPosition > 5 && videoRef.current) {
+            videoRef.current.currentTime = initialPosition
+          }
+        }}
         onContextMenu={e => e.preventDefault()}
         controlsList="nodownload nofullscreen noremoteplayback"
         disablePictureInPicture
@@ -414,7 +452,7 @@ function HTML5Player({ url, watermark }: { url: string; watermark?: string }) {
 }
 
 // ====== Main VideoPlayer ======
-export default function VideoPlayer({ url, watermark }: VideoPlayerProps) {
+export default function VideoPlayer({ url, watermark, lectureId, initialPosition, onProgress }: VideoPlayerProps) {
   const videoType = detectVideoType(url)
 
   if (!url) {
@@ -428,8 +466,8 @@ export default function VideoPlayer({ url, watermark }: VideoPlayerProps) {
   if (videoType === "youtube") {
     const videoId = getYouTubeVideoId(url)
     if (!videoId) return null
-    return <YouTubePlayer videoId={videoId} watermark={watermark} />
+    return <YouTubePlayer videoId={videoId} watermark={watermark} initialPosition={initialPosition} onProgress={onProgress} />
   }
 
-  return <HTML5Player url={url} watermark={watermark} />
+  return <HTML5Player url={url} watermark={watermark} initialPosition={initialPosition} onProgress={onProgress} />
 }

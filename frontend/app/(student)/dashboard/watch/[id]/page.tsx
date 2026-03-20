@@ -55,6 +55,9 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
   const [exam, setExam] = useState<ExamInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
+  const [initialPosition, setInitialPosition] = useState(0)
+  const [savedPosition, setSavedPosition] = useState(0)
+  const [showResumeDialog, setShowResumeDialog] = useState(false)
 
   useEffect(() => {
     const fetchLecture = async () => {
@@ -85,6 +88,14 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
 
             // سجّل إن الطالب شاف المحاضرة دي
             progressAPI.markWatched(lectureId).catch(() => {})
+
+            // جيب آخر موقف للطالب
+            progressAPI.getPosition(lectureId).then((pos: any) => {
+              if (pos.last_position && pos.last_position > 5) {
+                setSavedPosition(pos.last_position)
+                setShowResumeDialog(true)
+              }
+            }).catch(() => {})
 
             const idx = allLectures.findIndex((l: Lecture) => l.id === lectureId)
             setPrevLectureId(idx > 0 ? allLectures[idx - 1].id : null)
@@ -148,8 +159,44 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
     )
   }
 
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, "0")
+    const s = Math.floor(secs % 60).toString().padStart(2, "0")
+    return `${m}:${s}`
+  }
+
   return (
     <div className="space-y-6">
+      {/* Resume Dialog */}
+      {showResumeDialog && savedPosition > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-background rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl" dir="rtl">
+            <div className="text-center mb-5">
+              <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">▶️</span>
+              </div>
+              <h3 className="text-lg font-extrabold text-foreground">كملت المحاضرة دي قبل كده</h3>
+              <p className="text-muted-foreground text-sm mt-1">
+                وصلت لـ <span className="font-bold text-primary">{formatTime(savedPosition)}</span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { setInitialPosition(savedPosition); setShowResumeDialog(false) }}
+                className="w-full py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-colors"
+              >
+                كمّل من {formatTime(savedPosition)}
+              </button>
+              <button
+                onClick={() => { setInitialPosition(0); setShowResumeDialog(false) }}
+                className="w-full py-3 bg-muted hover:bg-muted/80 text-foreground font-medium rounded-xl transition-colors"
+              >
+                ابدأ من الأول
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <Link
         href={courseId ? `/dashboard/courses/${courseId}` : "/dashboard/courses"}
         className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -162,6 +209,11 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
         <VideoPlayer
           url={lecture.video_url || ""}
           watermark={studentWatermark}
+          lectureId={lectureId}
+          initialPosition={initialPosition}
+          onProgress={(position, duration) => {
+            progressAPI.savePosition(lectureId, position, duration).catch(() => {})
+          }}
         />
 
         <CardContent className="p-4 md:p-6">
