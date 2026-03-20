@@ -46,3 +46,47 @@ desktop.ini
 # ====== Misc ======
 structure.txt
 *.log
+# ===== Python / Backend =====
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.pyc
+
+# Virtual environments
+venv/
+env/
+.env/
+.venv/
+
+# Environment variables (مهم جداً!)
+backend/.env
+.env
+.env.local
+.env.*.local
+
+# ===== Node / Frontend =====
+node_modules/
+frontend/node_modules/
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# ===== IDE / Editor =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== OS Files =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Misc =====
+structure.txt
+*.log
+*.tmp

@@ -5,8 +5,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from .core.database import connect_db, close_db, get_db
 from .core.config import settings
-from .api.routes import auth, courses, codes, exams, notifications, users, progress, upload
-
+from .api.routes import auth, courses, codes, exams, notifications, users, progress, upload, stats
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,7 +44,7 @@ app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(progress.router, prefix="/api/v1")
 app.include_router(upload.router, prefix="/api/v1")
-
+app.include_router(stats.router, prefix="/api/v1")
 
 # Static files للصور
 Path("static/images").mkdir(parents=True, exist_ok=True)
