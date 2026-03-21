@@ -85,8 +85,7 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
             setCourseName(fullCourse.title)
             setUnitName(foundUnit?.title || "")
 
-            progressAPI.markWatched(lectureId).catch(() => {})
-
+            progressAPI.savePosition(lectureId, 100, 100).catch(() => {})
             progressAPI.getPosition(lectureId).then((pos: any) => {
               if (pos.last_position && pos.last_position > 5) {
                 setSavedPosition(pos.last_position)

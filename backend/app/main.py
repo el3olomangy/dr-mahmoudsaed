@@ -5,12 +5,11 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from .core.database import connect_db, close_db, get_db
 from .core.config import settings
-from .api.routes import auth, courses, codes, exams, notifications, users, progress, upload, stats, assignments
+from .api.routes import auth, courses, codes, exams, notifications, users, progress, upload, stats, assignments, grade_images
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
-    # TTL index — MongoDB بيمسح التوكنات المنتهية تلقائياً بعد expires_at
     db = get_db()
     await db.token_blacklist.create_index("expires_at", expireAfterSeconds=0)
     yield
@@ -35,7 +34,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(courses.router, prefix="/api/v1")
 app.include_router(codes.router, prefix="/api/v1")
@@ -46,11 +44,10 @@ app.include_router(progress.router, prefix="/api/v1")
 app.include_router(upload.router, prefix="/api/v1")
 app.include_router(stats.router, prefix="/api/v1")
 app.include_router(assignments.router, prefix="/api/v1")
+app.include_router(grade_images.router, prefix="/api/v1")
 
-# Static files للصور
 Path("static/images").mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 
 @app.get("/")
 async def root():

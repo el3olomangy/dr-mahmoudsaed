@@ -7,10 +7,10 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   User, Phone, MapPin, GraduationCap, Lock,
-  BookOpen, PlayCircle, FileCheck, CheckCircle, AlertCircle
+  BookOpen, PlayCircle, FileCheck, CheckCircle, AlertCircle, Eye, EyeOff
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import { usersAPI, progressAPI } from "@/lib/api"
+import { usersAPI, progressAPI, authAPI, coursesAPI } from "@/lib/api"
 
 const gradeLabels: Record<string, string> = {
   first_secondary: "الصف الأول الثانوي",
@@ -18,39 +18,41 @@ const gradeLabels: Record<string, string> = {
   third_secondary: "الصف الثالث الثانوي",
 }
 
-type PasswordStatus = "idle" | "success" | "error"
+type Status = "idle" | "success" | "error"
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
-  const [isChangingPassword, setIsChangingPassword] = useState(false)
-  const [isSavingProfile, setIsSavingProfile] = useState(false)
-  const [profileStatus, setProfileStatus] = useState<PasswordStatus>("idle")
-  const [profileMsg, setProfileMsg] = useState("")
-  const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" })
-  const [pwStatus, setPwStatus] = useState<PasswordStatus>("idle")
-  const [pwMsg, setPwMsg] = useState("")
-  const [isChangingPw, setIsChangingPw] = useState(false)
 
-  // Editable fields
+  // ====== Profile Edit ======
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [profileStatus, setProfileStatus] = useState<Status>("idle")
+  const [profileMsg, setProfileMsg] = useState("")
   const [editName, setEditName] = useState({
     first_name: user?.first_name || "",
     last_name: user?.last_name || "",
     governorate: user?.governorate || "",
   })
-  const [isEditingProfile, setIsEditingProfile] = useState(false)
+
+  // ====== Password Change ======
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isSubmittingPw, setIsSubmittingPw] = useState(false)
+  const [pwStatus, setPwStatus] = useState<Status>("idle")
+  const [pwMsg, setPwMsg] = useState("")
+  const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" })
+  const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false })
+
+  // ====== Stats ======
   const [stats, setStats] = useState({ watched: 0, exams_taken: 0, exams_passed: 0 })
 
-  // جيب أحدث بيانات الطالب من الـ API وحدّث الـ AuthContext
   useEffect(() => {
     const loadData = async () => {
       try {
         const [profileData, coursesData]: [any, any] = await Promise.all([
           usersAPI.getMyProfile(),
-          // جيب الكورسات الموجودة فعلاً عشان نفلتر المحذوفة
-          import("@/lib/api").then(m => m.coursesAPI.getAll()),
+          coursesAPI.getAll(),
         ])
 
-        // فلتر الـ enrolled_courses بالكورسات الموجودة فعلاً
         const existingCourseIds = new Set(coursesData.map((c: any) => c.id))
         const validCourses = (profileData.enrolled_courses || []).filter(
           (id: string) => existingCourseIds.has(id)
@@ -68,7 +70,6 @@ export default function ProfilePage() {
           governorate: profileData.governorate || "",
         })
 
-        // جيب إحصائيات التقدم من الكورسات الموجودة بس
         let totalWatched = 0, totalTaken = 0, totalPassed = 0
         await Promise.all(validCourses.map(async (courseId: string) => {
           try {
@@ -83,6 +84,8 @@ export default function ProfilePage() {
     }
     loadData()
   }, [])
+
+  // ====== handlers ======
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,7 +103,7 @@ export default function ProfilePage() {
         governorate: editName.governorate,
       })
       setProfileStatus("success")
-      setProfileMsg("تم تحديث البيانات بنجاح")
+      setProfileMsg("تم تحديث البيانات بنجاح ✓")
       setIsEditingProfile(false)
     } catch (err: any) {
       setProfileStatus("error")
@@ -112,6 +115,8 @@ export default function ProfilePage() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
+    setPwStatus("idle")
+
     if (passwords.new !== passwords.confirm) {
       setPwStatus("error")
       setPwMsg("كلمة المرور الجديدة غير متطابقة")
@@ -122,44 +127,94 @@ export default function ProfilePage() {
       setPwMsg("كلمة المرور لازم تكون 6 أحرف على الأقل")
       return
     }
-    setIsChangingPw(true)
-    setPwStatus("idle")
+    if (passwords.new === passwords.current) {
+      setPwStatus("error")
+      setPwMsg("كلمة المرور الجديدة لازم تكون مختلفة عن الحالية")
+      return
+    }
+
+    setIsSubmittingPw(true)
     try {
-      // استخدم الـ auth change-password endpoint
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"}/auth/change-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ old_password: passwords.current, new_password: passwords.new }),
+      await authAPI.changePassword({
+        old_password: passwords.current,
+        new_password: passwords.new,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || "حصل خطأ")
       setPwStatus("success")
-      setPwMsg("تم تغيير كلمة المرور بنجاح")
+      setPwMsg("تم تغيير كلمة المرور بنجاح ✓")
       setIsChangingPassword(false)
       setPasswords({ current: "", new: "", confirm: "" })
+      setShowPw({ current: false, new: false, confirm: false })
     } catch (err: any) {
       setPwStatus("error")
       setPwMsg(err.message || "حصل خطأ في تغيير كلمة المرور")
     } finally {
-      setIsChangingPw(false)
+      setIsSubmittingPw(false)
     }
   }
+
+  const handleCancelPassword = () => {
+    setIsChangingPassword(false)
+    setPwStatus("idle")
+    setPwMsg("")
+    setPasswords({ current: "", new: "", confirm: "" })
+    setShowPw({ current: false, new: false, confirm: false })
+  }
+
+  // ====== Password Input مع زرار إظهار/إخفاء ======
+  const PasswordInput = ({
+    label, field, placeholder,
+  }: {
+    label: string
+    field: "current" | "new" | "confirm"
+    placeholder?: string
+  }) => (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="relative">
+        <Input
+          type={showPw[field] ? "text" : "password"}
+          value={passwords[field]}
+          onChange={e => setPasswords(p => ({ ...p, [field]: e.target.value }))}
+          placeholder={placeholder}
+          required
+          minLength={field !== "current" ? 6 : undefined}
+          className="pl-10"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPw(p => ({ ...p, [field]: !p[field] }))}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+          tabIndex={-1}
+        >
+          {showPw[field]
+            ? <EyeOff className="w-4 h-4" />
+            : <Eye className="w-4 h-4" />
+          }
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
 
-      {/* Profile Info */}
+      {/* ====== Profile Info ====== */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-extrabold text-2xl">
-                  {user?.first_name?.[0]}{user?.last_name?.[0]}
-                </span>
+              <div className="w-16 h-16 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center shrink-0">
+                {user?.gender === "male" || user?.gender === "female" ? (
+                  <img
+                    src={user.gender === "male" ? "/boy-face.svg" : "/girl-face.svg"}
+                    alt="صورة الطالب"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-primary font-extrabold text-2xl">
+                    {user?.first_name?.[0]}{user?.last_name?.[0]}
+                  </span>
+                )}
               </div>
               <div>
                 <CardTitle className="text-2xl">{user?.first_name} {user?.last_name}</CardTitle>
@@ -214,12 +269,11 @@ export default function ProfilePage() {
               </div>
               {profileStatus === "error" && (
                 <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg text-destructive text-sm">
-                  <AlertCircle className="w-4 h-4" />
-                  {profileMsg}
+                  <AlertCircle className="w-4 h-4" />{profileMsg}
                 </div>
               )}
               <div className="flex gap-3">
-                <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSavingProfile}>
+                <Button type="submit" disabled={isSavingProfile}>
                   {isSavingProfile ? "جاري الحفظ..." : "حفظ التغييرات"}
                 </Button>
                 <Button type="button" variant="ghost" onClick={() => setIsEditingProfile(false)}>
@@ -230,9 +284,8 @@ export default function ProfilePage() {
           ) : (
             <>
               {profileStatus === "success" && (
-                <div className="flex items-center gap-2 p-3 bg-chart-3/10 rounded-lg text-chart-3 text-sm mb-4">
-                  <CheckCircle className="w-4 h-4" />
-                  {profileMsg}
+                <div className="flex items-center gap-2 p-3 bg-green-500/10 rounded-lg text-green-600 text-sm mb-4">
+                  <CheckCircle className="w-4 h-4" />{profileMsg}
                 </div>
               )}
               <div className="grid md:grid-cols-2 gap-6">
@@ -274,7 +327,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Stats */}
+      {/* ====== Stats ====== */}
       <Card>
         <CardHeader>
           <CardTitle>إحصائياتك</CardTitle>
@@ -283,8 +336,8 @@ export default function ProfilePage() {
           <div className="grid grid-cols-3 gap-4">
             {[
               { label: "كورسات مشترك", value: user?.enrolled_courses?.length || 0, icon: BookOpen, color: "text-primary" },
-              { label: "محاضرات اتشافت", value: stats.watched, icon: PlayCircle, color: "text-chart-4" },
-              { label: "اختبارات اتجازت", value: `${stats.exams_passed}/${stats.exams_taken}`, icon: FileCheck, color: "text-chart-3" },
+              { label: "محاضرات اتشافت", value: stats.watched, icon: PlayCircle, color: "text-blue-500" },
+              { label: "اختبارات اتجازت", value: `${stats.exams_passed}/${stats.exams_taken}`, icon: FileCheck, color: "text-green-500" },
             ].map((stat, i) => (
               <div key={i} className="text-center p-4 bg-muted/50 rounded-xl">
                 <stat.icon className={`w-8 h-8 ${stat.color} mx-auto mb-2`} />
@@ -296,7 +349,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Change Password */}
+      {/* ====== Change Password ====== */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -305,69 +358,44 @@ export default function ProfilePage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* رسالة النجاح بعد التغيير */}
           {pwStatus === "success" && !isChangingPassword && (
-            <div className="flex items-center gap-2 p-3 bg-chart-3/10 rounded-lg text-chart-3 text-sm mb-4">
-              <CheckCircle className="w-4 h-4" />
-              {pwMsg}
+            <div className="flex items-center gap-2 p-3 bg-green-500/10 rounded-lg text-green-600 text-sm mb-4">
+              <CheckCircle className="w-4 h-4" />{pwMsg}
             </div>
           )}
 
           {!isChangingPassword ? (
-            <Button variant="outline" onClick={() => { setIsChangingPassword(true); setPwStatus("idle") }}>
-              تغيير كلمة المرور
-            </Button>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                لو عاوز تغير كلمة المرور، اضغط الزرار وهتحتاج كلمة المرور الحالية.
+                لو نسيتها تواصل مع الدعم.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => { setIsChangingPassword(true); setPwStatus("idle") }}
+              >
+                <Lock className="w-4 h-4 ml-2" />
+                تغيير كلمة المرور
+              </Button>
+            </div>
           ) : (
             <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
-              <div className="space-y-2">
-                <Label>كلمة المرور الحالية</Label>
-                <Input
-                  type="password"
-                  value={passwords.current}
-                  onChange={e => setPasswords(p => ({ ...p, current: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>كلمة المرور الجديدة</Label>
-                <Input
-                  type="password"
-                  value={passwords.new}
-                  onChange={e => setPasswords(p => ({ ...p, new: e.target.value }))}
-                  required
-                  minLength={6}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>تأكيد كلمة المرور الجديدة</Label>
-                <Input
-                  type="password"
-                  value={passwords.confirm}
-                  onChange={e => setPasswords(p => ({ ...p, confirm: e.target.value }))}
-                  required
-                  minLength={6}
-                />
-              </div>
+              <PasswordInput label="كلمة المرور الحالية" field="current" />
+              <PasswordInput label="كلمة المرور الجديدة" field="new" placeholder="6 أحرف على الأقل" />
+              <PasswordInput label="تأكيد كلمة المرور الجديدة" field="confirm" />
 
               {pwStatus === "error" && (
                 <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg text-destructive text-sm">
-                  <AlertCircle className="w-4 h-4" />
-                  {pwMsg}
+                  <AlertCircle className="w-4 h-4" />{pwMsg}
                 </div>
               )}
 
               <div className="flex gap-3">
-                <Button
-                  type="submit"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                  disabled={isChangingPw}
-                >
-                  {isChangingPw ? "جاري التغيير..." : "حفظ التغييرات"}
+                <Button type="submit" disabled={isSubmittingPw}>
+                  {isSubmittingPw ? "جاري التغيير..." : "حفظ كلمة المرور"}
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => { setIsChangingPassword(false); setPwStatus("idle") }}
-                >
+                <Button type="button" variant="ghost" onClick={handleCancelPassword}>
                   إلغاء
                 </Button>
               </div>

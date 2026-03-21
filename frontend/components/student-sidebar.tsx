@@ -4,14 +4,17 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { 
-  Home, 
-  BookOpen, 
-  User, 
-  LogOut, 
+import { useTheme } from "next-themes"
+import {
+  Home,
+  BookOpen,
+  User,
+  LogOut,
   KeyRound,
   Bell,
-  ChevronLeft
+  ChevronLeft,
+  Sun,
+  Moon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/context/AuthContext"
@@ -38,6 +41,7 @@ interface StudentSidebarProps {
 export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
+  const { theme, setTheme } = useTheme()
 
   const handleLogout = () => {
     onClose()
@@ -48,25 +52,26 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
     <>
       {/* Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={onClose}
         />
       )}
-      
+
       {/* Sidebar */}
-      <aside 
+      <aside
         className={cn(
           "fixed top-0 right-0 z-50 h-full w-72 bg-card border-l border-border transform transition-transform duration-300 lg:translate-x-0 lg:static lg:z-auto",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
         <div className="flex flex-col h-full">
+
           {/* Header */}
           <div className="p-6 border-b border-border">
             <div className="flex items-center justify-between">
               <Link href="/">
-                <Image 
+                <Image
                   src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-BuyHgoZLI0SWgDwWIvZe8lSxWIu1dX.png"
                   alt="العلومنجي"
                   width={130}
@@ -74,7 +79,7 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
                   className="h-9 w-auto"
                 />
               </Link>
-              <button 
+              <button
                 onClick={onClose}
                 className="lg:hidden p-1 rounded-md hover:bg-muted"
               >
@@ -110,8 +115,8 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
-                    isActive 
-                      ? "bg-primary text-primary-foreground" 
+                    isActive
+                      ? "bg-primary text-primary-foreground"
                       : "hover:bg-muted text-foreground"
                   )}
                   onClick={onClose}
@@ -123,16 +128,36 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
             })}
           </nav>
 
-          {/* Logout */}
-          <div className="p-4 border-t border-border">
-            <Button 
-              variant="ghost" 
+          {/* Dark Mode + Logout */}
+          <div className="p-4 border-t border-border space-y-2">
+
+            {/* زرار الوضع */}
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted transition-colors text-foreground"
+            >
+              {theme === "dark" ? (
+                <>
+                  <Sun className="w-5 h-5 text-amber-500" />
+                  <span className="font-medium">الوضع النهاري</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-5 h-5 text-primary" />
+                  <span className="font-medium">الوضع الليلي</span>
+                </>
+              )}
+            </button>
+
+            <Button
+              variant="ghost"
               className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleLogout}
             >
               <LogOut className="w-5 h-5" />
               <span>تسجيل الخروج</span>
             </Button>
+
           </div>
         </div>
       </aside>

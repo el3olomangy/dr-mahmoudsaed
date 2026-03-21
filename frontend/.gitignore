@@ -1,71 +1,157 @@
-# ============================================
-# Python
-# ============================================
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-dist/
-build/
-*.egg
+# ============================================================
+# .gitignore - el3olomangy_plateform
+# ============================================================
 
-# ============================================
-# Environment & Secrets (لا ترفعهم أبداً!)
-# ============================================
+
+# ============================================================
+# SECRETS & ENVIRONMENT VARIABLES — لا ترفعهم أبدًا
+# ============================================================
 .env
 .env.*
 !.env.example
-backend/.env
+*.pem
+*.key
+*.secret
 
-# ============================================
-# Node / Frontend
-# ============================================
+
+# ============================================================
+# PYTHON
+# ============================================================
+
+# Bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+.venv/
+backend/venv/
+backend/env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+
+# Ruff / linters
+.ruff_cache/
+
+
+# ============================================================
+# NODE / FRONTEND
+# ============================================================
+
+# Dependencies — تتنزل بـ npm install
 node_modules/
 frontend/node_modules/
+
+# Next.js build output
 .next/
 frontend/.next/
 out/
 frontend/out/
-.npm
+
+# Build artifacts
+dist/
+build/
+frontend/dist/
+frontend/build/
+
+# Cache
+.npm/
+.yarn/
+.pnp/
+.pnp.js
+
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# ============================================
-# IDE & Editor
-# ============================================
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
 
-# ============================================
-# OS Files
-# ============================================
+
+# ============================================================
+# UPLOADED / GENERATED FILES — ملفات رفعها المستخدمين
+# ============================================================
+
+# Static uploaded images (generated at runtime — مش كود)
+backend/static/images/
+
+# لو عندك مجلد uploads
+backend/uploads/
+uploads/
+
+
+# ============================================================
+# DATABASE & SQL DUMPS
+# ============================================================
+*.sqlite
+*.sqlite3
+*.db
+*.sql.bak
+dump.sql
+
+
+# ============================================================
+# EDITOR & OS
+# ============================================================
+
+# VSCode
+.vscode/
+!.vscode/extensions.json
+
+# JetBrains
+.idea/
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
 Thumbs.db
+ehthumbs.db
 desktop.ini
 
-# ============================================
-# Logs & Temp
-# ============================================
+# Linux
+*~
+
+
+# ============================================================
+# MISCELLANEOUS
+# ============================================================
+
+# Structure exports
+structure.txt
+
+# Package lock (اختياري — شيل التعليق لو بتستخدمه)
+# package-lock.json
+
+# Logs
 *.log
 logs/
-tmp/
-temp/
 
-# ============================================
-# Uploads & Media (لو بتتعامل مع ملفات رفع)
-# ============================================
-backend/uploads/
-backend/media/
-
-# ============================================
-# Misc
-# ============================================
-structure.txt
+# Temp files
+*.tmp
+*.swp
+*.bak

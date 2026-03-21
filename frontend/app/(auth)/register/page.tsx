@@ -12,52 +12,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Phone,
-  Lock,
-  User,
-  ArrowLeft,
-  MapPin,
-  GraduationCap,
-} from "lucide-react";
+import { Phone, Lock, User, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authAPI } from "@/lib/api";
 
 const governorates = [
-  "القاهرة",
-  "الجيزة",
-  "الإسكندرية",
-  "الدقهلية",
-  "البحيرة",
-  "الشرقية",
-  "المنوفية",
-  "القليوبية",
-  "كفر الشيخ",
-  "الغربية",
-  "دمياط",
-  "بورسعيد",
-  "الإسماعيلية",
-  "السويس",
-  "الفيوم",
-  "بني سويف",
-  "المنيا",
-  "أسيوط",
-  "سوهاج",
-  "قنا",
-  "الأقصر",
-  "أسوان",
-  "البحر الأحمر",
-  "الوادي الجديد",
-  "مطروح",
-  "شمال سيناء",
-  "جنوب سيناء",
+  "القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "البحيرة",
+  "الشرقية", "المنوفية", "القليوبية", "كفر الشيخ", "الغربية",
+  "دمياط", "بورسعيد", "الإسماعيلية", "السويس", "الفيوم",
+  "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا",
+  "الأقصر", "أسوان", "البحر الأحمر", "الوادي الجديد",
+  "مطروح", "شمال سيناء", "جنوب سيناء",
 ];
 
 const grades = [
-  { value: "first_secondary", label: "الصف الأول الثانوي" },
-  { value: "second_secondary", label: "الصف الثاني الثانوي" },
-  { value: "third_secondary", label: "الصف الثالث الثانوي" },
+  { value: "first_preparatory",  label: "الصف الأول الإعدادي" },
+  { value: "second_preparatory", label: "الصف الثاني الإعدادي" },
+  { value: "third_preparatory",  label: "الصف الثالث الإعدادي" },
+  { value: "first_secondary",    label: "الصف الأول الثانوي" },
+  { value: "second_secondary",   label: "الصف الثاني الثانوي" },
+  { value: "third_secondary",    label: "الصف الثالث الثانوي" },
 ];
 
 export default function RegisterPage() {
@@ -88,7 +63,6 @@ export default function RegisterPage() {
       setError("كلمة المرور غير متطابقة");
       return;
     }
-
     if (!formData.gender || !formData.grade || !formData.governorate) {
       setError("من فضلك اختر النوع والمرحلة والمحافظة");
       return;
@@ -130,12 +104,8 @@ export default function RegisterPage() {
           </Link>
 
           <div className="mb-8">
-            <h1 className="text-3xl font-extrabold text-foreground">
-              إنشاء حساب جديد
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              سجل معانا وابدأ رحلة التفوق
-            </p>
+            <h1 className="text-3xl font-extrabold text-foreground">إنشاء حساب جديد</h1>
+            <p className="mt-2 text-muted-foreground">سجل معانا وابدأ رحلة التفوق</p>
           </div>
 
           {error && (
@@ -145,6 +115,7 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* الاسم */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">الاسم الأول</Label>
@@ -172,6 +143,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* الهاتف */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="phone">رقم هاتف الطالب</Label>
@@ -198,9 +170,7 @@ export default function RegisterPage() {
                     type="tel"
                     placeholder="01xxxxxxxxx"
                     value={formData.parentPhone}
-                    onChange={(e) =>
-                      handleChange("parentPhone", e.target.value)
-                    }
+                    onChange={(e) => handleChange("parentPhone", e.target.value)}
                     className="pr-10 text-left"
                     dir="ltr"
                     required
@@ -209,13 +179,11 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* النوع والمرحلة */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>النوع</Label>
-                <Select
-                  value={formData.gender}
-                  onValueChange={(v) => handleChange("gender", v)}
-                >
+                <Select value={formData.gender} onValueChange={(v) => handleChange("gender", v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="اختر النوع" />
                   </SelectTrigger>
@@ -227,43 +195,44 @@ export default function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <Label>المرحلة الدراسية</Label>
-                <Select
-                  value={formData.grade}
-                  onValueChange={(v) => handleChange("grade", v)}
-                >
+                <Select value={formData.grade} onValueChange={(v) => handleChange("grade", v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="اختر المرحلة" />
                   </SelectTrigger>
                   <SelectContent>
-                    {grades.map((grade) => (
-                      <SelectItem key={grade.value} value={grade.value}>
-                        {grade.label}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="first_preparatory" disabled className="text-xs text-muted-foreground font-bold pointer-events-none">
+                      — الإعدادي —
+                    </SelectItem>
+                    <SelectItem value="first_preparatory">الصف الأول الإعدادي</SelectItem>
+                    <SelectItem value="second_preparatory">الصف الثاني الإعدادي</SelectItem>
+                    <SelectItem value="third_preparatory">الصف الثالث الإعدادي</SelectItem>
+                    <SelectItem value="first_secondary" disabled className="text-xs text-muted-foreground font-bold pointer-events-none">
+                      — الثانوي —
+                    </SelectItem>
+                    <SelectItem value="first_secondary">الصف الأول الثانوي</SelectItem>
+                    <SelectItem value="second_secondary">الصف الثاني الثانوي</SelectItem>
+                    <SelectItem value="third_secondary">الصف الثالث الثانوي</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
+            {/* المحافظة */}
             <div className="space-y-2">
               <Label>المحافظة</Label>
-              <Select
-                value={formData.governorate}
-                onValueChange={(v) => handleChange("governorate", v)}
-              >
+              <Select value={formData.governorate} onValueChange={(v) => handleChange("governorate", v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="اختر المحافظة" />
                 </SelectTrigger>
                 <SelectContent>
                   {governorates.map((gov) => (
-                    <SelectItem key={gov} value={gov}>
-                      {gov}
-                    </SelectItem>
+                    <SelectItem key={gov} value={gov}>{gov}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
+            {/* كلمة المرور */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="password">كلمة المرور</Label>
@@ -290,9 +259,7 @@ export default function RegisterPage() {
                     type="password"
                     placeholder="********"
                     value={formData.confirmPassword}
-                    onChange={(e) =>
-                      handleChange("confirmPassword", e.target.value)
-                    }
+                    onChange={(e) => handleChange("confirmPassword", e.target.value)}
                     className="pr-10"
                     required
                     minLength={6}
@@ -312,10 +279,7 @@ export default function RegisterPage() {
 
           <p className="mt-8 text-center text-muted-foreground">
             عندك حساب بالفعل؟{" "}
-            <Link
-              href="/login"
-              className="text-primary font-bold hover:underline"
-            >
+            <Link href="/login" className="text-primary font-bold hover:underline">
               سجل دخول
             </Link>
           </p>
@@ -338,12 +302,8 @@ export default function RegisterPage() {
               className="object-contain"
             />
           </div>
-          <h2 className="text-3xl font-extrabold text-white mb-4">
-            انضم لمجتمع العلومنجي
-          </h2>
-          <p className="text-white/80 text-lg max-w-sm mx-auto">
-            ابدأ رحلة التفوق الدراسي معانا النهاردة
-          </p>
+          <h2 className="text-3xl font-extrabold text-white mb-4">انضم لمجتمع العلومنجي</h2>
+          <p className="text-white/80 text-lg max-w-sm mx-auto">ابدأ رحلة التفوق الدراسي معانا النهاردة</p>
         </div>
       </div>
     </div>

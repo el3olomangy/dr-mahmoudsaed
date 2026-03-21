@@ -3,19 +3,22 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Menu, X } from "lucide-react"
+import { Menu, X, Sun, Moon } from "lucide-react"
 import { useState } from "react"
+import { useTheme } from "next-themes"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
+  const { theme, setTheme } = useTheme()
 
   return (
     <header className="fixed top-0 right-0 left-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
+
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <Image 
+            <Image
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-BuyHgoZLI0SWgDwWIvZe8lSxWIu1dX.png"
               alt="العلومنجي"
               width={140}
@@ -25,7 +28,18 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-4">
+          <nav className="hidden md:flex items-center gap-2">
+            {/* زرار الثيم */}
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="p-2 rounded-xl hover:bg-muted transition-colors"
+              title={theme === "dark" ? "الوضع النهاري" : "الوضع الليلي"}
+            >
+              {theme === "dark"
+                ? <Sun className="w-5 h-5 text-amber-500" />
+                : <Moon className="w-5 h-5 text-muted-foreground" />
+              }
+            </button>
             <Button variant="ghost" asChild>
               <Link href="/login">تسجيل الدخول</Link>
             </Button>
@@ -34,14 +48,25 @@ export function Navbar() {
             </Button>
           </nav>
 
-          {/* Mobile Menu Button */}
-          <button 
-            className="md:hidden p-2"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-label="Toggle menu"
-          >
-            {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+          {/* Mobile: ثيم + هامبرجر */}
+          <div className="md:hidden flex items-center gap-1">
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="p-2 rounded-xl hover:bg-muted transition-colors"
+            >
+              {theme === "dark"
+                ? <Sun className="w-5 h-5 text-amber-500" />
+                : <Moon className="w-5 h-5 text-muted-foreground" />
+              }
+            </button>
+            <button
+              className="p-2"
+              onClick={() => setIsOpen(!isOpen)}
+              aria-label="Toggle menu"
+            >
+              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}

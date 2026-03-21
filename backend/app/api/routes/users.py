@@ -46,6 +46,10 @@ class AssistantCreate(BaseModel):
     password: str
 
 
+class ResetPasswordByAdmin(BaseModel):
+    new_password: str
+
+
 # ====== /me أولًا ======
 
 @router.get("/me/profile")
@@ -100,15 +104,12 @@ async def force_logout_student(
     current_user=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
-    from bson import ObjectId
-    from datetime import datetime, timezone
     oid = ObjectId(student_id) if ObjectId.is_valid(student_id) else None
     if not oid:
         raise HTTPException(status_code=422, detail="ID غير صالح")
     student = await db.users.find_one({"_id": oid})
     if not student:
         raise HTTPException(status_code=404, detail="الطالب مش موجود")
-    # حدّث force_logout_at — كل التوكنات اللي اتعملت قبله هتبقى منتهية
     await db.users.update_one(
         {"_id": oid},
         {"$set": {"force_logout_at": datetime.now(timezone.utc)}}
@@ -143,6 +144,31 @@ async def create_assistant(data: AssistantCreate, current_user=Depends(get_curre
         "phone": data.phone,
         "role": "assistant",
     }
+
+
+# ====== تغيير كلمة مرور طالب (المدرس فقط) ======
+
+@router.patch("/{user_id}/reset-password")
+async def reset_student_password(
+    user_id: str,
+    data: ResetPasswordByAdmin,
+    current_user=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="كلمة المرور لازم تكون 6 أحرف على الأقل")
+    oid = validate_object_id(user_id)
+    student = await db.users.find_one({"_id": oid})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب مش موجود")
+    if student["role"] == "teacher":
+        raise HTTPException(status_code=403, detail="مش هينفع تغير باسورد المدرس")
+    new_hash = get_password_hash(data.new_password)
+    await db.users.update_one(
+        {"_id": oid},
+        {"$set": {"password": new_hash}}
+    )
+    return {"message": f"تم تغيير كلمة مرور {student['first_name']} {student['last_name']} بنجاح"}
 
 
 # ====== المدرس / المساعد ======

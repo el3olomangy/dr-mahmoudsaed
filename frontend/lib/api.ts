@@ -1,243 +1,483 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+// ============================================================
+// lib/api.ts — كل الـ API calls بتاعت المنصة
+// الـ Base URL بتاخده من .env.local
+// ============================================================
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("token");
-}
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
 
-function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("refresh_token");
-}
-
-async function tryRefreshToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
-  try {
-    const res = await fetch(`${BASE_URL}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    localStorage.setItem("token", data.access_token);
-    if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
-    return data.access_token;
-  } catch {
-    return null;
-  }
-}
-
-function clearSessionAndRedirect() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("user");
-  document.cookie = "token=; path=/; max-age=0";
-  document.cookie = "user_role=; path=/; max-age=0";
-  window.location.href = "/login";
-}
-
-async function request<T>(
+async function request(
   endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const token = getToken();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  options: RequestInit = {},
+  isFormData = false
+) {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
+  const headers: Record<string, string> = {}
+
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json"
+  }
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
+  }
+
+  const res = await fetch(`${BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      ...headers,
+      ...(options.headers as Record<string, string>),
+    },
+  })
 
   if (res.status === 401) {
-    const newToken = await tryRefreshToken();
-    if (newToken) {
-      const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
-      const retryRes = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers: retryHeaders });
-      if (!retryRes.ok) {
-        const error = await retryRes.json().catch(() => ({ detail: "حصل خطأ" }));
-        if (retryRes.status === 401) clearSessionAndRedirect();
-        throw new Error(error.detail || "حصل خطأ");
-      }
-      return retryRes.json();
-    } else {
-      clearSessionAndRedirect();
-      throw new Error("انتهت الجلسة — سجّل دخولك من جديد");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("token")
+      localStorage.removeItem("refresh_token")
+      localStorage.removeItem("user")
+      document.cookie = "token=; path=/; max-age=0"
+      document.cookie = "user_role=; path=/; max-age=0"
+      window.location.href = "/login"
     }
+    throw new Error("غير مصرح")
   }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "حصل خطأ" }));
-    throw new Error(error.detail || "حصل خطأ");
+    const errorData = await res.json().catch(() => ({}))
+    throw new Error(errorData.detail || "حصل خطأ في السيرفر")
   }
 
-  return res.json();
+  const text = await res.text()
+  if (!text) return {}
+  return JSON.parse(text)
 }
 
-// ====== Auth ======
-export const authAPI = {
-  register: (data: object) =>
-    request("/auth/register", { method: "POST", body: JSON.stringify(data) }),
-  login: (data: object) =>
-    request("/auth/login", { method: "POST", body: JSON.stringify(data) }),
-};
+// ============================================================
+// AUTH
+// ============================================================
 
-// ====== Courses ======
+export const authAPI = {
+  register: (data: {
+    first_name: string
+    last_name: string
+    phone: string
+    parent_phone: string
+    password: string
+    grade?: string
+    governorate?: string
+    gender?: string
+  }) =>
+    request("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  login: (data: { phone: string; password: string; device_id: string }) =>
+    request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  logout: (refresh_token: string) =>
+    request("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token }),
+    }),
+
+  me: () => request("/auth/me"),
+
+  refresh: (refresh_token: string) =>
+    request("/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token }),
+    }),
+
+  changePassword: (data: { old_password: string; new_password: string }) =>
+    request("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+}
+
+// ============================================================
+// COURSES
+// ============================================================
+
 export const coursesAPI = {
   getAll: () => request("/courses/"),
-  getOne: (id: string) => request(`/courses/${id}`),
-  create: (data: object) =>
-    request("/courses/", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: object) =>
-    request(`/courses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: string) =>
-    request(`/courses/${id}`, { method: "DELETE" }),
-  createUnit: (courseId: string, data: object) =>
-    request(`/courses/${courseId}/units`, { method: "POST", body: JSON.stringify(data) }),
+
+  getOne: (courseId: string) => request(`/courses/${courseId}`),
+
+  create: (data: {
+    title: string
+    description?: string
+    grade: string
+    price?: number
+    thumbnail?: string
+  }) =>
+    request("/courses/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (
+    courseId: string,
+    data: {
+      title: string
+      description?: string
+      grade: string
+      price?: number
+      thumbnail?: string
+    }
+  ) =>
+    request(`/courses/${courseId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (courseId: string) =>
+    request(`/courses/${courseId}`, { method: "DELETE" }),
+
+  createUnit: (courseId: string, data: { title: string; order: number }) =>
+    request(`/courses/${courseId}/units`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   deleteUnit: (courseId: string, unitId: string) =>
     request(`/courses/${courseId}/units/${unitId}`, { method: "DELETE" }),
-  createLecture: (courseId: string, unitId: string, data: object) =>
-    request(`/courses/${courseId}/units/${unitId}/lectures`, { method: "POST", body: JSON.stringify(data) }),
-  updateLecture: (courseId: string, unitId: string, lectureId: string, data: object) =>
-    request(`/courses/${courseId}/units/${unitId}/lectures/${lectureId}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deleteLecture: (courseId: string, unitId: string, lectureId: string) =>
-    request(`/courses/${courseId}/units/${unitId}/lectures/${lectureId}`, { method: "DELETE" }),
-};
 
-// ====== Codes ======
-export const codesAPI = {
-  generate: (data: object) =>
-    request("/codes/generate", { method: "POST", body: JSON.stringify(data) }),
-  getAll: () => request("/codes/"),
-  activate: (code: string) =>
-    request("/codes/activate", { method: "POST", body: JSON.stringify({ code }) }),
-  disable: (id: string) =>
-    request(`/codes/${id}/disable`, { method: "PATCH" }),
-  delete: (id: string) =>
-    request(`/codes/${id}`, { method: "DELETE" }),
-  revokeFromStudent: (codeId: string, userId: string) =>
-    request(`/codes/${codeId}/revoke/${userId}`, { method: "PATCH" }),
-};
-
-// ====== Exams ======
-export const examsAPI = {
-  create: (data: object) =>
-    request("/exams/", { method: "POST", body: JSON.stringify(data) }),
-  getOne: (id: string) => request(`/exams/${id}`),
-  getByCourse: (courseId: string) => request(`/exams/course/${courseId}`),
-  submit: (data: object) =>
-    request("/exams/submit", { method: "POST", body: JSON.stringify(data) }),
-  getMyResult: (examId: string) => request(`/exams/my-result/${examId}`),
-  getResults: (examId: string) => request(`/exams/results/${examId}`),
-  // Essay Review
-  getForReview: (examId: string) => request(`/exams/review/${examId}`),
-  submitReview: (data: object) =>
-    request("/exams/review", { method: "POST", body: JSON.stringify(data) }),
-  // Edit / Delete / Full Update
-  updateExam: (id: string, data: object) =>
-    request(`/exams/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  fullUpdateExam: (id: string, data: object) =>
-    request(`/exams/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  getExamForAdmin: (id: string) => request(`/exams/admin/${id}`),
-  deleteExam: (id: string) =>
-    request(`/exams/${id}`, { method: "DELETE" }),
-};
-
-// ====== Notifications ======
-export const notificationsAPI = {
-  getAll: () => request("/notifications/"),
-  getUnreadCount: () => request("/notifications/unread-count"),
-  markRead: (id: string) =>
-    request(`/notifications/${id}/read`, { method: "PATCH" }),
-  markAllRead: () =>
-    request("/notifications/read-all", { method: "PATCH" }),
-  send: (data: object) =>
-    request("/notifications/", { method: "POST", body: JSON.stringify(data) }),
-};
-
-// ====== Upload ======
-export const uploadAPI = {
-  image: async (file: File): Promise<string> => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch(`${BASE_URL}/upload/image`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: formData,
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || "فشل رفع الصورة");
+  createLecture: (
+    courseId: string,
+    unitId: string,
+    data: {
+      title: string
+      description?: string
+      video_url?: string
+      pdf_url?: string
+      order: number
+      lecture_type: string
+      duration_minutes?: number
     }
-    const data = await res.json();
-    const base = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1").replace("/api/v1", "");
-    return data.url.startsWith("http") ? data.url : `${base}${data.url}`;
-  },
-};
+  ) =>
+    request(`/courses/${courseId}/units/${unitId}/lectures`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
-// ====== Progress ======
+  updateLecture: (
+    courseId: string,
+    unitId: string,
+    lectureId: string,
+    data: {
+      title?: string
+      description?: string
+      video_url?: string
+      pdf_url?: string
+      order?: number
+      lecture_type?: string
+      duration_minutes?: number
+    }
+  ) =>
+    request(`/courses/${courseId}/units/${unitId}/lectures/${lectureId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteLecture: (courseId: string, unitId: string, lectureId: string) =>
+    request(`/courses/${courseId}/units/${unitId}/lectures/${lectureId}`, {
+      method: "DELETE",
+    }),
+}
+
+// ============================================================
+// CODES
+// ============================================================
+
+export const codesAPI = {
+  getAll: () => request("/codes/"),
+
+  generate: (data: {
+    quantity: number
+    code_type: "course" | "bundle"
+    course_id?: string
+    bundle_ids?: string[]
+    expires_days?: number
+  }) =>
+    request("/codes/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  activate: (code: string) =>
+    request("/codes/activate", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+
+  disable: (codeId: string) =>
+    request(`/codes/${codeId}/disable`, { method: "PATCH" }),
+
+  delete: (codeId: string) =>
+    request(`/codes/${codeId}`, { method: "DELETE" }),
+
+  revoke: (codeId: string, userId: string) =>
+    request(`/codes/${codeId}/revoke/${userId}`, { method: "PATCH" }),
+}
+
+// ============================================================
+// EXAMS
+// ============================================================
+
+export const examsAPI = {
+  getByCourse: (courseId: string) => request(`/exams/course/${courseId}`),
+
+  getOne: (examId: string) => request(`/exams/${examId}`),
+
+  getExamForAdmin: (examId: string) => request(`/exams/${examId}/admin`),
+
+  create: (data: {
+    title: string
+    course_id: string
+    lecture_id?: string
+    pass_score: number
+    duration_minutes?: number
+    is_homework?: boolean
+    deadline?: string
+    questions: {
+      text: string
+      question_type: "mcq" | "essay"
+      points: number
+      choices?: { text: string; is_correct: boolean }[]
+    }[]
+  }) =>
+    request("/exams/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  fullUpdateExam: (examId: string, data: object) =>
+    request(`/exams/${examId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteExam: (examId: string) =>
+    request(`/exams/${examId}`, { method: "DELETE" }),
+
+  submit: (data: {
+    exam_id: string
+    answers: {
+      question_id: string
+      selected_choice?: string
+      essay_answer?: string
+    }[]
+  }) =>
+    request("/exams/submit", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getMyResult: (examId: string) => request(`/exams/${examId}/my-result`),
+
+  getResults: (examId: string) => request(`/exams/${examId}/results`),
+
+  submitReview: (
+    resultId: string,
+    data: { question_id: string; points: number }[]
+  ) =>
+    request(`/exams/results/${resultId}/review`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+}
+
+// ============================================================
+// USERS
+// ============================================================
+
+export const usersAPI = {
+  getMyProfile: () => request("/users/me/profile"),
+
+  updateProfile: (data: {
+    first_name?: string
+    last_name?: string
+    governorate?: string | null
+  }) =>
+    request("/users/me/profile", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  getAll: (params?: { grade?: string; search?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.grade) query.append("grade", params.grade)
+    if (params?.search) query.append("search", params.search)
+    const qs = query.toString()
+    return request(`/users/${qs ? "?" + qs : ""}`)
+  },
+
+  toggleActive: (userId: string) =>
+    request(`/users/${userId}/toggle-active`, { method: "PATCH" }),
+
+  deleteStudent: (userId: string) =>
+    request(`/users/${userId}`, { method: "DELETE" }),
+
+  resetDevice: (userId: string) =>
+    request(`/users/${userId}/reset-device`, { method: "PATCH" }),
+
+  resetPassword: (userId: string, newPassword: string) =>
+    request(`/users/${userId}/reset-password`, {
+      method: "PATCH",
+      body: JSON.stringify({ new_password: newPassword }),
+    }),
+
+  forceLogout: (userId: string) =>
+    request(`/users/${userId}/force-logout`, { method: "POST" }),
+}
+
+// ============================================================
+// PROGRESS
+// ============================================================
+
 export const progressAPI = {
-  markWatched: (lectureId: string) =>
-    request(`/progress/lecture/${lectureId}`, { method: "POST" }),
-  getCourseProgress: (courseId: string) =>
-    request(`/progress/course/${courseId}`),
-  getStudentCourseProgress: (studentId: string, courseId: string) =>
-    request(`/progress/student/${studentId}/course/${courseId}`),
   savePosition: (lectureId: string, position: number, duration: number) =>
     request(`/progress/lecture/${lectureId}/position`, {
       method: "POST",
       body: JSON.stringify({ position, duration }),
     }),
+
   getPosition: (lectureId: string) =>
     request(`/progress/lecture/${lectureId}/position`),
-};
 
-// ====== Users ======
-export const usersAPI = {
-  getAll: () => request("/users/"),
-  getOne: (id: string) => request(`/users/${id}`),
-  getMyProfile: () => request("/users/me/profile"),
-  updateProfile: (data: object) =>
-    request("/users/me/profile", { method: "PATCH", body: JSON.stringify(data) }),
-  toggleActive: (id: string) =>
-    request(`/users/${id}/toggle-active`, { method: "PATCH" }),
-  resetDevice: (id: string) =>
-    request(`/users/${id}/reset-device`, { method: "PATCH" }),
-  getByParentPhone: (phone: string) =>
-    request(`/users/parent/${phone}`),
-  deleteStudent: (id: string) =>
-    request(`/users/${id}`, { method: "DELETE" }),
-  forceLogout: (id: string) =>
-    request(`/users/${id}/force-logout`, { method: "POST" }),
-};
+  getCourseProgress: (courseId: string) =>
+    request(`/progress/course/${courseId}`),
 
-// ====== Stats ======
+  getStudentCourseProgress: (studentId: string, courseId: string) =>
+    request(`/progress/student/${studentId}/course/${courseId}`),
+}
+
+// ============================================================
+// STATS
+// ============================================================
+
 export const statsAPI = {
   getOverview: () => request("/stats/overview"),
-  getTopCourses: () => request("/stats/top-courses"),
-  getRecentStudents: () => request("/stats/recent-students"),
-  getExamStats: (examId: string) => request(`/stats/exam/${examId}`),
-};
 
-// ====== Assignments ======
+  getTopCourses: () => request("/stats/top-courses"),
+
+  getRecentStudents: () => request("/stats/recent-students"),
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+export const notificationsAPI = {
+  getAll: () => request("/notifications/"),
+
+  getUnreadCount: () => request("/notifications/unread-count"),
+
+  markRead: (notificationId: string) =>
+    request(`/notifications/${notificationId}/read`, { method: "PATCH" }),
+
+  markAllRead: () => request("/notifications/read-all", { method: "PATCH" }),
+
+  send: (data: {
+    title: string
+    body: string
+    notification_type: string
+    target_grade?: string
+    target_user_id?: string
+  }) =>
+    request("/notifications/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+}
+
+// ============================================================
+// ASSIGNMENTS
+// ============================================================
+
 export const assignmentsAPI = {
-  create: (data: object) =>
-    request("/assignments/", { method: "POST", body: JSON.stringify(data) }),
   getByLecture: (lectureId: string) =>
     request(`/assignments/lecture/${lectureId}`),
+
   getByCourse: (courseId: string) =>
     request(`/assignments/course/${courseId}`),
-  submit: (data: object) =>
-    request("/assignments/submit", { method: "POST", body: JSON.stringify(data) }),
+
+  getMySubmissions: () => request("/assignments/my-submissions"),
+
   getSubmissions: (assignmentId: string) =>
     request(`/assignments/${assignmentId}/submissions`),
-  gradeSubmission: (submissionId: string, data: object) =>
-    request(`/assignments/submissions/${submissionId}/grade`, { method: "PATCH", body: JSON.stringify(data) }),
-  getMySubmissions: () =>
-    request("/assignments/my-submissions"),
-  delete: (id: string) =>
-    request(`/assignments/${id}`, { method: "DELETE" }),
-};
+
+  submit: (data: { assignment_id: string; text_answer: string }) =>
+    request("/assignments/submit", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  grade: (submissionId: string, data: { grade: number; teacher_note?: string }) =>
+    request(`/assignments/submissions/${submissionId}/grade`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  create: (data: {
+    title: string
+    description: string
+    lecture_id: string
+    course_id: string
+    deadline?: string
+  }) =>
+    request("/assignments/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (assignmentId: string) =>
+    request(`/assignments/${assignmentId}`, { method: "DELETE" }),
+}
+
+// ============================================================
+// UPLOAD
+// ============================================================
+
+export const uploadAPI = {
+  image: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData()
+    formData.append("file", file)
+
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null
+
+    const res = await fetch(`${BASE_URL}/upload/image`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || "فشل رفع الصورة")
+    }
+
+    return res.json()
+  },
+}
+
+// ============================================================
+// GRADE IMAGES — صور المراحل الدراسية
+// ============================================================
+
+export const gradeImagesAPI = {
+  getAll: () => request("/grade-images/"),
+
+  update: (grade: string, imageUrl: string) =>
+    request(`/grade-images/${grade}`, {
+      method: "PATCH",
+      body: JSON.stringify({ image_url: imageUrl }),
+    }),
+}

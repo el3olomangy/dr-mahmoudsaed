@@ -31,6 +31,7 @@ class ChangePasswordRequest(BaseModel):
 async def register(data: UserRegister):
     db = get_db()
 
+    # بنتحقق بس من رقم الطالب — رقم ولي الأمر مسموح يتكرر
     existing = await db.users.find_one({"phone": data.phone})
     if existing:
         raise HTTPException(status_code=400, detail="رقم الهاتف مسجل بالفعل")
@@ -47,6 +48,7 @@ async def register(data: UserRegister):
         role=UserRole.student,
         grade=data.grade,
         governorate=data.governorate,
+        gender=data.gender,
     )
 
 
@@ -94,6 +96,7 @@ async def login(data: UserLogin):
             role=user["role"],
             grade=user.get("grade"),
             governorate=user.get("governorate"),
+            gender=user.get("gender"),
         )
     )
 
@@ -102,7 +105,6 @@ async def login(data: UserLogin):
 
 @router.post("/refresh")
 async def refresh_token(data: RefreshRequest):
-    # تحقق إن التوكن مش في الـ blacklist
     if await is_token_blacklisted(data.refresh_token):
         raise HTTPException(status_code=401, detail="Refresh token منتهي أو تم تسجيل الخروج")
 
@@ -120,7 +122,6 @@ async def refresh_token(data: RefreshRequest):
     if not user or not user.get("is_active"):
         raise HTTPException(status_code=401, detail="الحساب غير موجود أو موقوف")
 
-    # بطّل التوكن القديم واعمل واحد جديد (Refresh Token Rotation)
     await blacklist_token(data.refresh_token)
     new_access = create_access_token(data={"sub": user_id, "role": role})
     new_refresh = create_refresh_token(data={"sub": user_id, "role": role})

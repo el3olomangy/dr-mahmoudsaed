@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BookOpen, PlayCircle, FileCheck, ArrowLeft, KeyRound } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import { coursesAPI } from "@/lib/api"
+import { coursesAPI, progressAPI } from "@/lib/api"
 import { getImageUrl } from "@/lib/utils/image"
 
 interface Course {
@@ -23,33 +23,75 @@ export default function DashboardPage() {
   const { user, updateUser } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [stats, setStats] = useState({
+    enrolled: 0,
+    watched: 0,
+    exams_passed: 0,
+    exams_taken: 0,
+  })
 
   useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchData = async () => {
       try {
         const data = await coursesAPI.getAll() as Course[]
-        // فلتر الكورسات المشترك فيها بالموجودة فعلاً فقط
+
+        // فلتر الكورسات الموجودة فعلاً
         const existingIds = new Set(data.map((c: Course) => c.id))
         const validEnrolled = (user?.enrolled_courses || []).filter(id => existingIds.has(id))
         if (validEnrolled.length !== (user?.enrolled_courses || []).length) {
           updateUser({ enrolled_courses: validEnrolled })
         }
+
         setCourses(data.slice(0, 3))
+
+        // جيب الإحصائيات من كل الكورسات المشترك فيها
+        let totalWatched = 0
+        let totalPassed = 0
+        let totalTaken = 0
+
+        await Promise.all(validEnrolled.map(async (courseId: string) => {
+          try {
+            const p: any = await progressAPI.getCourseProgress(courseId)
+            totalWatched += p.watched || 0
+            totalPassed += p.exam_stats?.passed || 0
+            totalTaken += p.exam_stats?.taken || 0
+          } catch {}
+        }))
+
+        setStats({
+          enrolled: validEnrolled.length,
+          watched: totalWatched,
+          exams_passed: totalPassed,
+          exams_taken: totalTaken,
+        })
       } catch (err) {
         console.error(err)
       } finally {
         setIsLoading(false)
       }
     }
-    fetchCourses()
+    fetchData()
   }, [])
 
-  const enrolledCount = courses.filter(c => c.is_enrolled).length
-
-  const stats = [
-    { label: "كورساتي", value: enrolledCount.toString(), icon: BookOpen, color: "text-primary" },
-    { label: "فيديوهات مشاهدة", value: "—", icon: PlayCircle, color: "text-secondary" },
-    { label: "اختبارات محلولة", value: "—", icon: FileCheck, color: "text-chart-3" },
+  const statCards = [
+    {
+      label: "كورساتي",
+      value: isLoading ? "..." : stats.enrolled.toString(),
+      icon: BookOpen,
+      color: "text-primary",
+    },
+    {
+      label: "فيديوهات مشاهدة",
+      value: isLoading ? "..." : stats.watched.toString(),
+      icon: PlayCircle,
+      color: "text-blue-500",
+    },
+    {
+      label: "اختبارات محلولة",
+      value: isLoading ? "..." : `${stats.exams_passed}/${stats.exams_taken}`,
+      icon: FileCheck,
+      color: "text-green-500",
+    },
   ]
 
   return (
@@ -91,14 +133,14 @@ export default function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        {stats.map((stat, index) => (
+        {statCards.map((stat, index) => (
           <Card key={index}>
             <CardContent className="p-4 lg:p-6 flex items-center gap-4">
               <div className={`w-12 h-12 rounded-xl bg-muted flex items-center justify-center ${stat.color}`}>
                 <stat.icon className="w-6 h-6" />
               </div>
               <div>
-                {isLoading && index === 0 ? (
+                {isLoading ? (
                   <Skeleton className="h-8 w-10 mb-1" />
                 ) : (
                   <p className="text-2xl lg:text-3xl font-extrabold text-foreground">{stat.value}</p>
@@ -146,7 +188,11 @@ export default function DashboardPage() {
                 <div key={course.id} className="group bg-muted/50 rounded-xl overflow-hidden border border-border hover:border-primary/30 transition-colors">
                   <div className="relative aspect-video bg-muted">
                     {course.thumbnail ? (
-                      <img src={getImageUrl(course.thumbnail) || ""} alt={course.title} className="absolute inset-0 w-full h-full object-cover" />
+                      <img
+                        src={getImageUrl(course.thumbnail) || ""}
+                        alt={course.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <BookOpen className="w-10 h-10 text-muted-foreground" />

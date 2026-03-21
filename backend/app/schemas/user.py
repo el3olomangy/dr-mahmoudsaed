@@ -12,9 +12,12 @@ class Gender(str, Enum):
     female = "female"
 
 class Grade(str, Enum):
-    first = "first_secondary"
-    second = "second_secondary"
-    third = "third_secondary"
+    first_preparatory  = "first_preparatory"
+    second_preparatory = "second_preparatory"
+    third_preparatory  = "third_preparatory"
+    first_secondary    = "first_secondary"
+    second_secondary   = "second_secondary"
+    third_secondary    = "third_secondary"
 
 class UserRegister(BaseModel):
     first_name: str = Field(..., min_length=2)
@@ -39,6 +42,7 @@ class UserResponse(BaseModel):
     role: UserRole
     grade: Optional[Grade] = None
     governorate: Optional[str] = None
+    gender: Optional[Gender] = None
 
 class Token(BaseModel):
     access_token: str

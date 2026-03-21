@@ -6,20 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Users,
-  Search,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  Smartphone,
-  ShieldOff,
-  ChevronDown,
-  ChevronUp,
-  Trash2,
-  BookOpen,
-  PlayCircle,
-  FileCheck,
-  LogOut,
+  Users, Search, RefreshCw, CheckCircle, XCircle,
+  Smartphone, ChevronDown, ChevronUp, Trash2,
+  BookOpen, PlayCircle, FileCheck, LogOut, Lock, X,
 } from "lucide-react";
 import { usersAPI, progressAPI, coursesAPI } from "@/lib/api";
 
@@ -50,6 +39,13 @@ export default function StudentsPage() {
   const [courseNames, setCourseNames] = useState<Record<string, string>>({});
   const [studentProgress, setStudentProgress] = useState<Record<string, any>>({});
 
+  // Reset Password Dialog
+  const [resetPwDialog, setResetPwDialog] = useState<{ id: string; name: string } | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetPwLoading, setResetPwLoading] = useState(false);
+  const [resetPwError, setResetPwError] = useState("");
+  const [resetPwSuccess, setResetPwSuccess] = useState(false);
+
   useEffect(() => {
     fetchStudents();
     coursesAPI.getAll().then((data: any) => {
@@ -77,7 +73,7 @@ export default function StudentsPage() {
     try {
       await usersAPI.toggleActive(id);
       setStudents((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, is_active: !s.is_active } : s)),
+        prev.map((s) => (s.id === id ? { ...s, is_active: !s.is_active } : s))
       );
     } catch (err: any) {
       alert(err.message || "حصل خطأ");
@@ -87,8 +83,7 @@ export default function StudentsPage() {
   };
 
   const handleResetDevice = async (id: string) => {
-    if (!confirm("هتعمل reset للجهاز — الطالب هيقدر يسجل من جهاز جديد. متأكد؟"))
-      return;
+    if (!confirm("هتعمل reset للجهاز — الطالب هيقدر يسجل من جهاز جديد. متأكد؟")) return;
     setLoadingAction(`reset-${id}`);
     try {
       await usersAPI.resetDevice(id);
@@ -127,14 +122,111 @@ export default function StudentsPage() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetPwDialog) return;
+    if (newPassword.length < 6) {
+      setResetPwError("كلمة المرور لازم تكون 6 أحرف على الأقل");
+      return;
+    }
+    setResetPwLoading(true);
+    setResetPwError("");
+    try {
+      await (usersAPI as any).resetPassword(resetPwDialog.id, newPassword);
+      setResetPwSuccess(true);
+      setTimeout(() => {
+        setResetPwDialog(null);
+        setNewPassword("");
+        setResetPwSuccess(false);
+      }, 1500);
+    } catch (err: any) {
+      setResetPwError(err.message || "حصل خطأ");
+    } finally {
+      setResetPwLoading(false);
+    }
+  };
+
+  const closeResetDialog = () => {
+    setResetPwDialog(null);
+    setNewPassword("");
+    setResetPwError("");
+    setResetPwSuccess(false);
+  };
+
   const filtered = students.filter((s) =>
     `${s.first_name} ${s.last_name} ${s.phone}`
       .toLowerCase()
-      .includes(search.toLowerCase()),
+      .includes(search.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
+
+      {/* ====== Reset Password Dialog ====== */}
+      {resetPwDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={closeResetDialog}
+        >
+          <div
+            className="bg-background rounded-2xl p-6 max-w-sm w-full shadow-xl border border-border"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Lock className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-extrabold text-foreground">تغيير كلمة المرور</h2>
+                  <p className="text-xs text-muted-foreground">{resetPwDialog.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={closeResetDialog}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {resetPwSuccess ? (
+              <div className="flex items-center justify-center gap-2 p-4 bg-green-500/10 rounded-xl text-green-600 font-medium">
+                <CheckCircle className="w-5 h-5" />
+                تم تغيير كلمة المرور بنجاح
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  <Input
+                    type="text"
+                    placeholder="كلمة المرور الجديدة (6 أحرف على الأقل)"
+                    value={newPassword}
+                    onChange={e => { setNewPassword(e.target.value); setResetPwError("") }}
+                    className="text-left"
+                    dir="ltr"
+                  />
+                  {resetPwError && (
+                    <p className="text-xs text-destructive">{resetPwError}</p>
+                  )}
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <Button
+                    className="flex-1"
+                    disabled={resetPwLoading || newPassword.length < 6}
+                    onClick={handleResetPassword}
+                  >
+                    {resetPwLoading ? "جاري التغيير..." : "حفظ كلمة المرور"}
+                  </Button>
+                  <Button variant="ghost" onClick={closeResetDialog}>
+                    إلغاء
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-foreground">الطلاب</h1>
@@ -143,9 +235,7 @@ export default function StudentsPage() {
           </p>
         </div>
         <Button variant="outline" onClick={fetchStudents} disabled={isLoading}>
-          <RefreshCw
-            className={`w-4 h-4 ml-2 ${isLoading ? "animate-spin" : ""}`}
-          />
+          <RefreshCw className={`w-4 h-4 ml-2 ${isLoading ? "animate-spin" : ""}`} />
           تحديث
         </Button>
       </div>
@@ -164,9 +254,7 @@ export default function StudentsPage() {
       {error && (
         <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center justify-between">
           <p className="text-destructive text-sm">{error}</p>
-          <Button variant="ghost" size="sm" onClick={fetchStudents}>
-            إعادة المحاولة
-          </Button>
+          <Button variant="ghost" size="sm" onClick={fetchStudents}>إعادة المحاولة</Button>
         </div>
       )}
 
@@ -209,15 +297,10 @@ export default function StudentsPage() {
                 <div key={student.id}>
                   {/* Row */}
                   <div className="p-4 flex items-center gap-4">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                        student.is_active
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {student.first_name[0]}
-                      {student.last_name[0]}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                      student.is_active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {student.first_name[0]}{student.last_name[0]}
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -231,17 +314,11 @@ export default function StudentsPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground" dir="ltr">
-                        {student.phone}
-                      </p>
+                      <p className="text-sm text-muted-foreground" dir="ltr">{student.phone}</p>
                     </div>
 
                     <div className="hidden md:block text-sm text-muted-foreground text-left shrink-0">
-                      <p>
-                        {gradeLabels[student.grade || ""] ||
-                          student.grade ||
-                          "—"}
-                      </p>
+                      <p>{gradeLabels[student.grade || ""] || student.grade || "—"}</p>
                       <p>{student.enrolled_courses.length} كورس</p>
                     </div>
 
@@ -249,26 +326,14 @@ export default function StudentsPage() {
                       <Button
                         size="sm"
                         variant={student.is_active ? "destructive" : "default"}
-                        className={
-                          student.is_active
-                            ? ""
-                            : "bg-chart-3 hover:bg-chart-3/90 text-white"
-                        }
+                        className={student.is_active ? "" : "bg-chart-3 hover:bg-chart-3/90 text-white"}
                         disabled={loadingAction === `toggle-${student.id}`}
                         onClick={() => handleToggleActive(student.id)}
                       >
-                        {loadingAction === `toggle-${student.id}` ? (
-                          "..."
-                        ) : student.is_active ? (
-                          <>
-                            <XCircle className="w-4 h-4 ml-1" />
-                            إيقاف
-                          </>
+                        {loadingAction === `toggle-${student.id}` ? "..." : student.is_active ? (
+                          <><XCircle className="w-4 h-4 ml-1" />إيقاف</>
                         ) : (
-                          <>
-                            <CheckCircle className="w-4 h-4 ml-1" />
-                            تفعيل
-                          </>
+                          <><CheckCircle className="w-4 h-4 ml-1" />تفعيل</>
                         )}
                       </Button>
 
@@ -290,11 +355,9 @@ export default function StudentsPage() {
                           }
                         }}
                       >
-                        {expandedId === student.id ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
+                        {expandedId === student.id
+                          ? <ChevronUp className="w-4 h-4" />
+                          : <ChevronDown className="w-4 h-4" />}
                       </Button>
                     </div>
                   </div>
@@ -305,32 +368,25 @@ export default function StudentsPage() {
                       <div className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">المرحلة</p>
-                          <p className="font-medium">
-                            {gradeLabels[student.grade || ""] || "—"}
-                          </p>
+                          <p className="font-medium">{gradeLabels[student.grade || ""] || "—"}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">المحافظة</p>
-                          <p className="font-medium">
-                            {student.governorate || "—"}
-                          </p>
+                          <p className="font-medium">{student.governorate || "—"}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">الكورسات</p>
-                          <p className="font-medium">
-                            {student.enrolled_courses.length} كورس
-                          </p>
+                          <p className="font-medium">{student.enrolled_courses.length} كورس</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">الحالة</p>
-                          <p
-                            className={`font-medium ${student.is_active ? "text-chart-3" : "text-destructive"}`}
-                          >
+                          <p className={`font-medium ${student.is_active ? "text-chart-3" : "text-destructive"}`}>
                             {student.is_active ? "نشط" : "موقوف"}
                           </p>
                         </div>
                       </div>
-                      {/* تقدم الطالب في الكورسات */}
+
+                      {/* تقدم الطالب */}
                       {student.enrolled_courses.length > 0 && (
                         <div className="mt-4 space-y-2">
                           <p className="text-xs font-bold text-muted-foreground">تقدم الطالب</p>
@@ -348,7 +404,8 @@ export default function StudentsPage() {
                                   <span className="text-xs font-bold text-primary">{p ? `${p.percentage}%` : "—"}</span>
                                 </div>
                                 <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                                  <div className="bg-primary h-2 rounded-full transition-all duration-500" style={{ width: p ? `${p.percentage}%` : "0%" }} />
+                                  <div className="bg-primary h-2 rounded-full transition-all duration-500"
+                                    style={{ width: p ? `${p.percentage}%` : "0%" }} />
                                 </div>
                                 {p && (
                                   <div className="flex items-center justify-between mt-1.5 text-xs text-muted-foreground">
@@ -368,7 +425,22 @@ export default function StudentsPage() {
                         </div>
                       )}
 
+                      {/* Action Buttons */}
                       <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                          onClick={() => {
+                            setResetPwDialog({ id: student.id, name: `${student.first_name} ${student.last_name}` });
+                            setNewPassword("");
+                            setResetPwError("");
+                            setResetPwSuccess(false);
+                          }}
+                        >
+                          <Lock className="w-4 h-4 ml-2" />
+                          تغيير الباسورد
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -377,9 +449,7 @@ export default function StudentsPage() {
                           onClick={() => handleResetDevice(student.id)}
                         >
                           <Smartphone className="w-4 h-4 ml-2" />
-                          {loadingAction === `reset-${student.id}`
-                            ? "جاري الـ reset..."
-                            : "Reset الجهاز"}
+                          {loadingAction === `reset-${student.id}` ? "جاري الـ reset..." : "Reset الجهاز"}
                         </Button>
                         <Button
                           size="sm"
@@ -389,25 +459,16 @@ export default function StudentsPage() {
                           onClick={() => handleForceLogout(student.id, `${student.first_name} ${student.last_name}`)}
                         >
                           <LogOut className="w-4 h-4 ml-2" />
-                          {loadingAction === `logout-${student.id}`
-                            ? "جاري الطرد..."
-                            : "تسجيل خروج إجباري"}
+                          {loadingAction === `logout-${student.id}` ? "جاري الطرد..." : "تسجيل خروج إجباري"}
                         </Button>
                         <Button
                           size="sm"
                           variant="destructive"
                           disabled={loadingAction === `delete-${student.id}`}
-                          onClick={() =>
-                            handleDeleteStudent(
-                              student.id,
-                              `${student.first_name} ${student.last_name}`,
-                            )
-                          }
+                          onClick={() => handleDeleteStudent(student.id, `${student.first_name} ${student.last_name}`)}
                         >
                           <Trash2 className="w-4 h-4 ml-2" />
-                          {loadingAction === `delete-${student.id}`
-                            ? "جاري الحذف..."
-                            : "حذف الحساب"}
+                          {loadingAction === `delete-${student.id}` ? "جاري الحذف..." : "حذف الحساب"}
                         </Button>
                       </div>
                     </div>

@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { StudentSidebar } from "@/components/student-sidebar"
-import { Menu, Bell } from "lucide-react"
+import { Menu, Bell, Sun, Moon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/context/AuthContext"
+import { useTheme } from "next-themes"
 
 export default function DashboardLayout({
   children,
@@ -15,6 +16,7 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { isAuthenticated, isLoading } = useAuth()
+  const { theme, setTheme } = useTheme()
   const router = useRouter()
 
   useEffect(() => {
@@ -23,7 +25,6 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, isLoading, router])
 
-  // اعرض شاشة تحميل لحد ما نتأكد من الـ auth
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
@@ -40,26 +41,47 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-muted/30 flex">
       <StudentSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
+
       <div className="flex-1 flex flex-col min-h-screen">
-        {/* Mobile Header */}
-        <header className="lg:hidden sticky top-0 z-30 bg-background border-b border-border px-4 h-16 flex items-center justify-between">
-          <button 
+        {/* Header — ظاهر دايماً */}
+        <header className="sticky top-0 z-30 bg-background border-b border-border px-4 h-16 flex items-center justify-between">
+
+          {/* زرار الـ sidebar — موبايل بس */}
+          <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-md hover:bg-muted"
+            className="lg:hidden p-2 rounded-md hover:bg-muted"
           >
             <Menu className="w-6 h-6" />
           </button>
-          
-          <Link href="/dashboard/notifications">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 left-1 w-2 h-2 bg-primary rounded-full" />
-            </Button>
-          </Link>
+
+          <div className="hidden lg:block" />
+
+          {/* الأيقونات */}
+          <div className="flex items-center gap-1">
+
+            {/* زرار الثيم */}
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="p-2 rounded-md hover:bg-muted transition-colors"
+              title={theme === "dark" ? "الوضع النهاري" : "الوضع الليلي"}
+            >
+              {theme === "dark"
+                ? <Sun className="w-5 h-5 text-amber-500" />
+                : <Moon className="w-5 h-5 text-muted-foreground" />
+              }
+            </button>
+
+            {/* الإشعارات */}
+            <Link href="/dashboard/notifications">
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-1 left-1 w-2 h-2 bg-primary rounded-full" />
+              </Button>
+            </Link>
+
+          </div>
         </header>
-        
-        {/* Main Content */}
+
         <main className="flex-1 p-4 lg:p-8">
           {children}
         </main>
