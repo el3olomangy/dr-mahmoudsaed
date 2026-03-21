@@ -24,9 +24,7 @@ interface Course {
   id: string; title: string; description?: string; grade: string
   price?: number; thumbnail?: string; units: Unit[]; is_enrolled: boolean
 }
-interface ExamInfo { id: string; title: string; duration_minutes: number; lecture_id: string | null }
-
-const gradeLabels: Record<string, string> = {
+interface ExamInfo { id: string; title: string; duration_minutes: number; lecture_id: string | null; is_homework: boolean; deadline?: string }const gradeLabels: Record<string, string> = {
   first_secondary: "الصف الأول الثانوي",
   second_secondary: "الصف الثاني الثانوي",
   third_secondary: "الصف الثالث الثانوي",
@@ -216,7 +214,7 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ id: st
                     {/* ====== Accordion المستوى الثاني: المحاضرات ====== */}
                     <Accordion type="multiple" className="w-full">
                       {unit.lectures.map((lecture, lecIdx) => {
-                        const lectureExam = exams.find(e => e.lecture_id === lecture.id)
+                        const lectureItems = exams.filter(e => e.lecture_id === lecture.id)
                         const isLocked = !lecture.is_enrolled
 
                         return (
@@ -246,8 +244,11 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ id: st
                                     {lecture.pdf_url && !isLocked && (
                                       <span className="text-xs text-secondary">+ PDF</span>
                                     )}
-                                    {lectureExam && !isLocked && (
+                                    {lectureItems.filter(i => !i.is_homework).length > 0 && !isLocked && (
                                       <span className="text-xs text-chart-4 font-bold">+ اختبار</span>
+                                    )}
+                                    {lectureItems.filter(i => i.is_homework).length > 0 && !isLocked && (
+                                      <span className="text-xs text-blue-500 font-bold">+ واجب</span>
                                     )}
                                   </div>
                                 </div>
@@ -308,22 +309,45 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ id: st
                                       </a>
                                     )}
 
-                                    {/* الاختبار */}
-                                    {lectureExam && (
-                                      <Link
-                                        href={`/dashboard/exam/${lectureExam.id}`}
-                                        className="flex items-center gap-3 p-3 bg-chart-4/5 hover:bg-chart-4/10 border border-chart-4/20 rounded-xl transition-colors"
-                                      >
-                                        <div className="w-9 h-9 rounded-lg bg-chart-4/20 flex items-center justify-center shrink-0">
-                                          <FileCheck className="w-5 h-5 text-chart-4" />
+                                    {/* الاختبارات والواجبات */}
+                                    {lectureItems.map(item => {
+                                      const isExpired = item.is_homework && item.deadline && new Date() > new Date(item.deadline + "Z")
+                                      return isExpired ? (
+                                        <div
+                                          key={item.id}
+                                          className="flex items-center gap-3 p-3 rounded-xl border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"
+                                        >
+                                          <div className="w-9 h-9 rounded-lg bg-red-100 dark:bg-red-800/40 flex items-center justify-center shrink-0">
+                                            <FileText className="w-5 h-5 text-red-500" />
+                                          </div>
+                                          <div className="flex-1">
+                                            <p className="font-bold text-sm text-foreground">{item.title}</p>
+                                            <p className="text-xs text-red-500 font-bold">انتهى وقت التسليم</p>
+                                          </div>
                                         </div>
-                                        <div className="flex-1">
-                                          <p className="font-bold text-sm text-foreground">{lectureExam.title}</p>
-                                          <p className="text-xs text-muted-foreground">{lectureExam.duration_minutes} دقيقة</p>
-                                        </div>
-                                        <span className="text-xs font-bold text-chart-4 bg-chart-4/10 px-2 py-1 rounded-lg shrink-0">ابدأ</span>
-                                      </Link>
-                                    )}
+                                      ) : (
+                                        <Link
+                                          key={item.id}
+                                          href={`/dashboard/exam/${item.id}`}
+                                          className={`flex items-center gap-3 p-3 rounded-xl transition-colors border ${item.is_homework ? "bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/20" : "bg-chart-4/5 hover:bg-chart-4/10 border-chart-4/20"}`}
+                                        >
+                                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${item.is_homework ? "bg-blue-500/20" : "bg-chart-4/20"}`}>
+                                            {item.is_homework
+                                              ? <FileText className="w-5 h-5 text-blue-500" />
+                                              : <FileCheck className="w-5 h-5 text-chart-4" />}
+                                          </div>
+                                          <div className="flex-1">
+                                            <p className="font-bold text-sm text-foreground">{item.title}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {item.is_homework ? "واجب" : `${item.duration_minutes} دقيقة`}
+                                            </p>
+                                          </div>
+                                          <span className={`text-xs font-bold px-2 py-1 rounded-lg shrink-0 ${item.is_homework ? "text-blue-500 bg-blue-500/10" : "text-chart-4 bg-chart-4/10"}`}>
+                                            {item.is_homework ? "حل" : "ابدأ"}
+                                          </span>
+                                        </Link>
+                                      )
+                                    })}
                                   </>
                                 )}
                               </div>

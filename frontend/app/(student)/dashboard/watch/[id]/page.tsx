@@ -212,15 +212,20 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
       </Link>
 
       <Card className="overflow-hidden">
-        <VideoPlayer
-          url={lecture.video_url || ""}
-          watermark={studentWatermark}
-          lectureId={lectureId}
-          initialPosition={initialPosition}
-          onProgress={(position, duration) => {
-            progressAPI.savePosition(lectureId, position, duration).catch(() => {})
-          }}
-        />
+        {!showResumeDialog && (
+          <VideoPlayer
+            url={lecture.video_url || ""}
+            watermark={studentWatermark}
+            lectureId={lectureId}
+            initialPosition={initialPosition}
+            onProgress={(position, duration) => {
+              progressAPI.savePosition(lectureId, position, duration).catch(() => {})
+            }}
+          />
+        )}
+        {showResumeDialog && (
+          <div className="aspect-video bg-black" />
+        )}
 
         <CardContent className="p-4 md:p-6">
           <div className="mb-4">

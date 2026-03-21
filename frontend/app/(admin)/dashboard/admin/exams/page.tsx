@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ClipboardList, Plus, Clock, BookOpen, Pencil, Trash2, PlayCircle, Calendar } from "lucide-react"
+import { ClipboardList, Plus, Clock, BookOpen, Pencil, Trash2, PlayCircle, Calendar, BarChart2, Search, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { coursesAPI, examsAPI } from "@/lib/api"
@@ -23,16 +24,13 @@ interface Course {
   title: string
 }
 
-// ====== Edit Exam Dialog ======
-
-
-// ====== Main Page ======
 export default function AdminExamsPage() {
   const router = useRouter()
   const [courses, setCourses] = useState<Course[]>([])
   const [examsByCourse, setExamsByCourse] = useState<Record<string, ExamItem[]>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
+  const [search, setSearch] = useState("")
 
   useEffect(() => {
     const load = async () => {
@@ -72,6 +70,19 @@ export default function AdminExamsPage() {
 
   const totalExams = Object.values(examsByCourse).reduce((s, arr) => s + arr.length, 0)
 
+  // فلترة الاختبارات بناءً على الـ search
+  const getFilteredExams = (exams: ExamItem[]) => {
+    if (!search.trim()) return exams
+    return exams.filter(e =>
+      e.title.toLowerCase().includes(search.toLowerCase())
+    )
+  }
+
+  const hasResults = courses.some(c => {
+    const exams = examsByCourse[c.id]
+    return exams && getFilteredExams(exams).length > 0
+  })
+
   return (
     <div className="space-y-6" dir="rtl">
 
@@ -90,6 +101,27 @@ export default function AdminExamsPage() {
           </Button>
         </Link>
       </div>
+
+      {/* Search */}
+      {!isLoading && totalExams > 0 && (
+        <div className="relative">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="ابحث باسم الاختبار..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pr-9"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
@@ -114,25 +146,33 @@ export default function AdminExamsPage() {
             </Link>
           </CardContent>
         </Card>
+      ) : !hasResults ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Search className="w-10 h-10 mx-auto mb-3 opacity-40" />
+          <p>مفيش اختبارات بالاسم ده</p>
+          <button onClick={() => setSearch("")} className="text-primary text-sm mt-2 hover:underline">
+            مسح البحث
+          </button>
+        </div>
       ) : (
         <div className="space-y-6">
           {courses.map(course => {
             const exams = examsByCourse[course.id]
-            if (!exams || exams.length === 0) return null
+            if (!exams) return null
+            const filtered = getFilteredExams(exams)
+            if (filtered.length === 0) return null
             return (
               <div key={course.id}>
-                {/* Course Header */}
                 <div className="flex items-center gap-2 mb-3">
                   <BookOpen className="w-4 h-4 text-muted-foreground" />
                   <h2 className="font-bold text-foreground">{course.title}</h2>
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                    {exams.length} اختبار
+                    {filtered.length} اختبار
                   </span>
                 </div>
 
-                {/* Exams List */}
                 <div className="space-y-2">
-                  {exams.map(exam => (
+                  {filtered.map(exam => (
                     <Card key={exam.id} className="hover:shadow-sm transition-shadow">
                       <CardContent className="p-4 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
@@ -174,6 +214,13 @@ export default function AdminExamsPage() {
 
                         {/* Actions */}
                         <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => router.push(`/dashboard/admin/exams/results?id=${exam.id}`)}
+                            className="p-1.5 rounded hover:bg-primary/10 transition-colors"
+                            title="نتائج الطلاب"
+                          >
+                            <BarChart2 className="w-4 h-4 text-primary" />
+                          </button>
                           <button
                             onClick={() => router.push(`/dashboard/admin/exams/edit?id=${exam.id}`)}
                             className="p-1.5 rounded hover:bg-muted transition-colors"

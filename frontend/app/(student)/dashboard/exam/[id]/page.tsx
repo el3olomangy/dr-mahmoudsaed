@@ -16,6 +16,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  FileText,
 } from "lucide-react";
 import { examsAPI } from "@/lib/api";
 
@@ -36,6 +37,7 @@ interface Exam {
   id: string;
   title: string;
   duration_minutes: number;
+  is_homework: boolean;
   questions: Question[];
 }
 
@@ -79,8 +81,68 @@ type ExamState =
   | "submitting"
   | "result";
 
-// إجابات الطالب: question_id -> choice_id أو نص مقالي
 type Answers = Record<string, string>;
+
+function ChoicesList({ q }: { q: MCQReview }) {
+  return (
+    <div className="space-y-1.5">
+      {q.choices.map((c, ci) => {
+        const isCorrect = !!(q.correct_text && c.text === q.correct_text);
+        const isSelected = !!(q.selected_text && c.text === q.selected_text);
+        const isWrong = isSelected && !isCorrect;
+        return (
+          <div
+            key={ci}
+            className="flex items-center gap-2 p-2 rounded-lg text-sm"
+            style={{
+              backgroundColor: isCorrect
+                ? "#dcfce7"
+                : isWrong
+                  ? "#fee2e2"
+                  : "transparent",
+              opacity: !isCorrect && !isWrong ? 0.5 : 1,
+            }}
+          >
+            <span
+              className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+              style={{
+                backgroundColor: isCorrect
+                  ? "#22c55e"
+                  : isWrong
+                    ? "#ef4444"
+                    : undefined,
+                color: isCorrect || isWrong ? "white" : undefined,
+              }}
+            >
+              {isCorrect ? "✓" : isWrong ? "✗" : ""}
+            </span>
+            <span
+              className={
+                isCorrect
+                  ? "text-green-800 dark:text-green-200"
+                  : isWrong
+                    ? "text-red-800 dark:text-red-200"
+                    : "text-muted-foreground"
+              }
+            >
+              {c.text}
+            </span>
+            {isCorrect && !q.is_correct && (
+              <span className="text-xs text-green-600 dark:text-green-400 mr-auto font-bold">
+                الإجابة الصح
+              </span>
+            )}
+            {isWrong && (
+              <span className="text-xs text-red-600 dark:text-red-400 mr-auto">
+                إجابتك
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function ExamPage({
   params,
@@ -100,22 +162,19 @@ export default function ExamPage({
   const [result, setResult] = useState<ExamResult | null>(null);
   const [showReview, setShowReview] = useState(false);
 
-  // تحميل الاختبار + التحقق من نتيجة سابقة
   useEffect(() => {
     const fetchExam = async () => {
       try {
-        // جيب بيانات الاختبار
         const data = (await examsAPI.getOne(examId)) as Exam;
         setExam(data);
-        setTimeLeft(data.duration_minutes * 60);
-
-        // تحقق لو الطالب عمل الاختبار ده قبل كده
+        if (!data.is_homework) {
+          setTimeLeft(data.duration_minutes * 60);
+        }
         try {
           const prevResult = (await examsAPI.getMyResult(examId)) as ExamResult;
           setPreviousResult(prevResult);
           setExamState("already_done");
         } catch {
-          // مش عملوش قبل كده — طبيعي
           setExamState("intro");
         }
       } catch (err: any) {
@@ -126,9 +185,9 @@ export default function ExamPage({
     fetchExam();
   }, [examId]);
 
-  // تايمر
   useEffect(() => {
     if (examState !== "taking") return;
+    if (exam?.is_homework) return;
     if (timeLeft <= 0) {
       handleSubmit();
       return;
@@ -144,7 +203,7 @@ export default function ExamPage({
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [examState]);
+  }, [examState, exam]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
@@ -161,8 +220,6 @@ export default function ExamPage({
   const handleSubmit = async () => {
     if (!exam) return;
     setExamState("submitting");
-
-    // بناء الـ answers بالشكل اللي بيتوقعه الـ API
     const answersPayload = exam.questions.map((q) => {
       const val = answers[q.id];
       if (q.question_type === "mcq") {
@@ -179,14 +236,11 @@ export default function ExamPage({
         };
       }
     });
-
     try {
       const res: any = await examsAPI.submit({
         exam_id: examId,
         answers: answersPayload,
       });
-
-      // لو النتيجة فورية — جيب التفاصيل الكاملة من getMyResult
       if (res.score !== undefined) {
         try {
           const fullResult = (await examsAPI.getMyResult(examId)) as ExamResult;
@@ -211,7 +265,6 @@ export default function ExamPage({
     }
   };
 
-  // ====== Loading ======
   if (examState === "loading") {
     return (
       <div className="max-w-2xl mx-auto space-y-4">
@@ -231,7 +284,6 @@ export default function ExamPage({
     );
   }
 
-  // ====== Error ======
   if (examState === "error") {
     return (
       <div className="max-w-2xl mx-auto text-center py-16">
@@ -248,7 +300,6 @@ export default function ExamPage({
     );
   }
 
-  // ====== Already Done ======
   if (examState === "already_done" && previousResult) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -267,10 +318,12 @@ export default function ExamPage({
               {exam?.title}
             </CardTitle>
             <p className="text-muted-foreground mt-1">
-              عملت الاختبار ده قبل كده
+              {exam?.is_homework
+                ? "سلّمت الواجب ده قبل كده"
+                : "عملت الاختبار ده قبل كده"}
             </p>
           </CardHeader>
-          <CardContent className="text-center space-y-6">
+          <CardContent className="text-center space-y-6 pb-8">
             <div className="text-6xl font-extrabold text-primary">
               {Math.round(previousResult.score)}%
             </div>
@@ -293,7 +346,6 @@ export default function ExamPage({
             >
               {previousResult.passed ? "ناجح ✓" : "لم تنجح"}
             </div>
-            {/* تصحيح المقالي */}
             {previousResult.essay_fully_reviewed &&
               previousResult.essay_reviews &&
               previousResult.essay_reviews.length > 0 && (
@@ -334,7 +386,6 @@ export default function ExamPage({
                 الأسئلة المقالية لسه في انتظار تصحيح المدرس
               </div>
             )}
-            {/* مراجعة MCQ */}
             {previousResult.mcq_reviews &&
               previousResult.mcq_reviews.length > 0 && (
                 <>
@@ -363,61 +414,7 @@ export default function ExamPage({
                               {q.is_correct ? "✓ صح" : "✗ غلط"}
                             </span>
                           </div>
-                          <div className="space-y-1.5">
-                            {q.choices.map((c, ci) => {
-                              const isSelected = !!(
-                                q.selected_text && c.text === q.selected_text
-                              );
-                              const isCorrect = !!(
-                                q.correct_text && c.text === q.correct_text
-                              );
-                              return (
-                                <div
-                                  key={ci}
-                                  className={`flex items-center gap-2 p-2 rounded-lg text-sm ${
-                                    isCorrect
-                                      ? "bg-green-100 dark:bg-green-800/40 font-medium"
-                                      : isSelected
-                                        ? "bg-red-100 dark:bg-red-800/40"
-                                        : "opacity-50"
-                                  }`}
-                                >
-                                  <span
-                                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                                      isCorrect
-                                        ? "bg-green-500 text-white"
-                                        : isSelected
-                                          ? "bg-red-500 text-white"
-                                          : "bg-muted text-muted-foreground"
-                                    }`}
-                                  >
-                                    {isCorrect ? "✓" : isSelected ? "✗" : ""}
-                                  </span>
-                                  <span
-                                    className={
-                                      isCorrect
-                                        ? "text-green-800 dark:text-green-200"
-                                        : isSelected
-                                          ? "text-red-800 dark:text-red-200"
-                                          : "text-muted-foreground"
-                                    }
-                                  >
-                                    {c.text}
-                                  </span>
-                                  {isCorrect && !q.is_correct && (
-                                    <span className="text-xs text-green-600 dark:text-green-400 mr-auto font-bold">
-                                      الإجابة الصح
-                                    </span>
-                                  )}
-                                  {isSelected && !isCorrect && (
-                                    <span className="text-xs text-red-600 dark:text-red-400 mr-auto">
-                                      إجابتك
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
+                          <ChoicesList q={q} />
                         </div>
                       ))}
                     </div>
@@ -436,7 +433,6 @@ export default function ExamPage({
     );
   }
 
-  // ====== Intro ======
   if (examState === "intro" && exam) {
     const mcqCount = exam.questions.filter(
       (q) => q.question_type === "mcq",
@@ -444,6 +440,7 @@ export default function ExamPage({
     const essayCount = exam.questions.filter(
       (q) => q.question_type === "essay",
     ).length;
+    const isHomework = exam.is_homework;
     return (
       <div className="max-w-2xl mx-auto">
         <Link
@@ -453,33 +450,43 @@ export default function ExamPage({
           <ArrowRight className="w-4 h-4" />
           <span>العودة للكورسات</span>
         </Link>
-
         <Card>
           <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-chart-4/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Clock className="w-8 h-8 text-chart-4" />
+            <div
+              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isHomework ? "bg-blue-500/10" : "bg-chart-4/10"}`}
+            >
+              {isHomework ? (
+                <FileText className="w-8 h-8 text-blue-500" />
+              ) : (
+                <Clock className="w-8 h-8 text-chart-4" />
+              )}
             </div>
             <CardTitle className="text-2xl font-extrabold">
               {exam.title}
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-center space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+          <CardContent className="text-center space-y-6 pb-8">
+            <div
+              className={`grid gap-4 ${isHomework ? "grid-cols-1" : "grid-cols-2"}`}
+            >
               <div className="p-4 bg-muted rounded-xl">
                 <p className="text-2xl font-bold text-foreground">
                   {exam.questions.length}
                 </p>
                 <p className="text-sm text-muted-foreground">عدد الأسئلة</p>
               </div>
-              <div className="p-4 bg-muted rounded-xl">
-                <p className="text-2xl font-bold text-foreground">
-                  {exam.duration_minutes} دقيقة
-                </p>
-                <p className="text-sm text-muted-foreground">مدة الاختبار</p>
-              </div>
+              {!isHomework && (
+                <div className="p-4 bg-muted rounded-xl">
+                  <p className="text-2xl font-bold text-foreground">
+                    {exam.duration_minutes} دقيقة
+                  </p>
+                  <p className="text-sm text-muted-foreground">مدة الاختبار</p>
+                </div>
+              )}
             </div>
-
-            <div className="p-4 bg-chart-4/10 border border-chart-4/30 rounded-xl text-right space-y-1">
+            <div
+              className={`p-4 border rounded-xl text-right space-y-1 ${isHomework ? "bg-blue-500/10 border-blue-500/30" : "bg-chart-4/10 border-chart-4/30"}`}
+            >
               <h3 className="font-bold text-foreground mb-2">تعليمات مهمة:</h3>
               {mcqCount > 0 && (
                 <p className="text-sm text-muted-foreground">
@@ -491,22 +498,29 @@ export default function ExamPage({
                   - {essayCount} سؤال مقالي
                 </p>
               )}
+              {!isHomework && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    - الوقت بيتحسب من لما تضغط ابدأ
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    - لو الوقت خلص هيتسلم تلقائياً
+                  </p>
+                </>
+              )}
               <p className="text-sm text-muted-foreground">
-                - الوقت بيتحسب من لما تضغط ابدأ
-              </p>
-              <p className="text-sm text-muted-foreground">
-                - لو الوقت خلص هيتسلم تلقائياً
-              </p>
-              <p className="text-sm text-muted-foreground">
-                - الاختبار مرة واحدة بس
+                - {isHomework ? "الواجب" : "الاختبار"} مرة واحدة بس
               </p>
             </div>
-
             <Button
               onClick={() => setExamState("taking")}
-              className="w-full bg-chart-4 hover:bg-chart-4/90 text-white font-bold py-6"
+              className="w-full font-bold py-6"
+              style={{
+                backgroundColor: isHomework ? "#3b82f6" : "#f59e0b",
+                color: "white",
+              }}
             >
-              ابدأ الاختبار
+              {isHomework ? "ابدأ الواجب" : "ابدأ الاختبار"}
             </Button>
           </CardContent>
         </Card>
@@ -514,9 +528,7 @@ export default function ExamPage({
     );
   }
 
-  // ====== Result ======
   if (examState === "result") {
-    // النتيجة الفورية
     if (result) {
       return (
         <div className="max-w-2xl mx-auto">
@@ -535,11 +547,10 @@ export default function ExamPage({
                 {result.passed ? "أحسنت!" : "حاول تذاكر أكتر"}
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-center space-y-6">
+            <CardContent className="text-center space-y-6 pb-8">
               <div className="text-6xl font-extrabold text-primary">
                 {Math.round(result.score)}%
               </div>
-
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 bg-muted rounded-xl">
                   <p className="text-xl font-bold text-foreground">
@@ -560,8 +571,6 @@ export default function ExamPage({
                   <p className="text-xs text-muted-foreground">الإجمالي</p>
                 </div>
               </div>
-
-              {/* مراجعة إجابات MCQ */}
               {exam && (
                 <Button
                   onClick={() => setShowReview(!showReview)}
@@ -571,7 +580,6 @@ export default function ExamPage({
                   {showReview ? "إخفاء" : "مراجعة"} الإجابات
                 </Button>
               )}
-
               {showReview &&
                 result?.mcq_reviews &&
                 result.mcq_reviews.length > 0 && (
@@ -591,66 +599,11 @@ export default function ExamPage({
                             {q.is_correct ? "✓ صح" : "✗ غلط"}
                           </span>
                         </div>
-                        <div className="space-y-1.5">
-                          {q.choices.map((c) => {
-                            const isSelected = !!(
-                              q.selected_text && c.text === q.selected_text
-                            );
-                            const isCorrect = !!(
-                              q.correct_text && c.text === q.correct_text
-                            );
-                            return (
-                              <div
-                                key={c.id}
-                                className={`flex items-center gap-2 p-2 rounded-lg text-sm ${
-                                  isCorrect
-                                    ? "bg-green-100 dark:bg-green-800/40 font-medium"
-                                    : isSelected && !isCorrect
-                                      ? "bg-red-100 dark:bg-red-800/40"
-                                      : "opacity-50"
-                                }`}
-                              >
-                                <span
-                                  className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                                    isCorrect
-                                      ? "bg-green-500 text-white"
-                                      : isSelected && !isCorrect
-                                        ? "bg-red-500 text-white"
-                                        : "bg-muted text-muted-foreground"
-                                  }`}
-                                >
-                                  {isCorrect ? "✓" : isSelected ? "✗" : ""}
-                                </span>
-                                <span
-                                  className={
-                                    isCorrect
-                                      ? "text-green-800 dark:text-green-200"
-                                      : isSelected && !isCorrect
-                                        ? "text-red-800 dark:text-red-200"
-                                        : "text-muted-foreground"
-                                  }
-                                >
-                                  {c.text}
-                                </span>
-                                {isCorrect && (
-                                  <span className="text-xs text-green-600 dark:text-green-400 mr-auto">
-                                    الإجابة الصح
-                                  </span>
-                                )}
-                                {isSelected && !isCorrect && (
-                                  <span className="text-xs text-red-600 dark:text-red-400 mr-auto">
-                                    إجابتك
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
+                        <ChoicesList q={q} />
                       </div>
                     ))}
                   </div>
                 )}
-
               <Button
                 asChild
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
@@ -662,12 +615,12 @@ export default function ExamPage({
         </div>
       );
     }
-
-    // النتيجة مش فورية
     return (
       <div className="max-w-2xl mx-auto text-center py-16">
         <CheckCircle className="w-16 h-16 text-chart-3 mx-auto mb-4" />
-        <h2 className="text-2xl font-extrabold mb-2">تم تسليم الاختبار!</h2>
+        <h2 className="text-2xl font-extrabold mb-2">
+          {exam?.is_homework ? "تم تسليم الواجب!" : "تم تسليم الاختبار!"}
+        </h2>
         <p className="text-muted-foreground mb-8">
           النتيجة هتظهر بعد مراجعة المدرس
         </p>
@@ -681,33 +634,38 @@ export default function ExamPage({
     );
   }
 
-  // ====== Taking Exam ======
   if (!exam) return null;
   const question = exam.questions[currentQuestion];
   const answeredCount = Object.keys(answers).length;
+  const isHomework = exam.is_homework;
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* شريط التايمر */}
       <div className="sticky top-0 z-10 bg-background border-b border-border p-4 mb-6 -mx-4 lg:-mx-8 px-4 lg:px-8">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock
-              className={`w-5 h-5 ${timeLeft < 60 ? "text-destructive animate-pulse" : "text-chart-4"}`}
-            />
-            <span
-              className={`font-mono font-bold text-lg ${timeLeft < 60 ? "text-destructive" : ""}`}
-            >
-              {formatTime(timeLeft)}
-            </span>
-          </div>
+          {!isHomework ? (
+            <div className="flex items-center gap-2">
+              <Clock
+                className={`w-5 h-5 ${timeLeft < 60 ? "text-destructive animate-pulse" : "text-chart-4"}`}
+              />
+              <span
+                className={`font-mono font-bold text-lg ${timeLeft < 60 ? "text-destructive" : ""}`}
+              >
+                {formatTime(timeLeft)}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-500" />
+              <span className="font-bold text-sm text-blue-500">واجب</span>
+            </div>
+          )}
           <span className="text-sm text-muted-foreground">
             {answeredCount} / {exam.questions.length} سؤال
           </span>
         </div>
       </div>
 
-      {/* نافيجيتور الأسئلة */}
       <div className="flex flex-wrap gap-2 mb-6">
         {exam.questions.map((q, index) => (
           <button
@@ -726,7 +684,6 @@ export default function ExamPage({
         ))}
       </div>
 
-      {/* السؤال */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -765,7 +722,6 @@ export default function ExamPage({
               ))}
             </RadioGroup>
           )}
-
           {question.question_type === "essay" && (
             <Textarea
               placeholder="اكتب إجابتك هنا..."
@@ -777,7 +733,6 @@ export default function ExamPage({
         </CardContent>
       </Card>
 
-      {/* التنقل */}
       <div className="flex items-center justify-between mt-6">
         <Button
           variant="outline"
@@ -787,7 +742,6 @@ export default function ExamPage({
           <ChevronRight className="w-4 h-4 ml-2" />
           السابق
         </Button>
-
         {currentQuestion < exam.questions.length - 1 ? (
           <Button
             onClick={() => setCurrentQuestion((prev) => prev + 1)}
@@ -802,7 +756,11 @@ export default function ExamPage({
             disabled={examState === "submitting"}
             className="bg-chart-3 hover:bg-chart-3/90 text-white"
           >
-            {examState === "submitting" ? "جاري التسليم..." : "إنهاء الاختبار"}
+            {examState === "submitting"
+              ? "جاري التسليم..."
+              : isHomework
+                ? "سلّم الواجب"
+                : "إنهاء الاختبار"}
           </Button>
         )}
       </div>

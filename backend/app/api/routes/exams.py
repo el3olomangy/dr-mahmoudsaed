@@ -326,8 +326,7 @@ async def get_my_result(exam_id: str, current_user=Depends(get_current_user), db
             "selected_text": selected_text,
             "correct_text": correct_text,
             "is_correct": is_correct,
-            "choices": [{"text": c["text"], "is_correct": c.get("is_correct", False)} for c in choices],
-        })
+            "choices": [{"id": str(i), "text": c["text"], "is_correct": c.get("is_correct", False)} for i, c in enumerate(choices)],        })
 
     return {
         "score": result["score"],

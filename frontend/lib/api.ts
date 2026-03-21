@@ -10,7 +10,6 @@ function getRefreshToken(): string | null {
   return localStorage.getItem("refresh_token");
 }
 
-// تجديد الـ access token تلقائياً
 async function tryRefreshToken(): Promise<string | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
@@ -22,7 +21,6 @@ async function tryRefreshToken(): Promise<string | null> {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    // حفظ التوكنات الجديدة
     localStorage.setItem("token", data.access_token);
     if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
     return data.access_token;
@@ -31,7 +29,6 @@ async function tryRefreshToken(): Promise<string | null> {
   }
 }
 
-// مسح بيانات الجلسة والتحويل للـ login
 function clearSessionAndRedirect() {
   localStorage.removeItem("token");
   localStorage.removeItem("refresh_token");
@@ -54,7 +51,6 @@ async function request<T>(
 
   const res = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
 
-  // لو 401 — جرب تجدد التوكن وأعد الـ request مرة واحدة
   if (res.status === 401) {
     const newToken = await tryRefreshToken();
     if (newToken) {
@@ -62,13 +58,11 @@ async function request<T>(
       const retryRes = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers: retryHeaders });
       if (!retryRes.ok) {
         const error = await retryRes.json().catch(() => ({ detail: "حصل خطأ" }));
-        // لو 401 تاني — انتهت الجلسة خالص
         if (retryRes.status === 401) clearSessionAndRedirect();
         throw new Error(error.detail || "حصل خطأ");
       }
       return retryRes.json();
     } else {
-      // مفيش refresh token أو انتهى — امسح الجلسة وروح للـ login
       clearSessionAndRedirect();
       throw new Error("انتهت الجلسة — سجّل دخولك من جديد");
     }
@@ -86,7 +80,6 @@ async function request<T>(
 export const authAPI = {
   register: (data: object) =>
     request("/auth/register", { method: "POST", body: JSON.stringify(data) }),
-
   login: (data: object) =>
     request("/auth/login", { method: "POST", body: JSON.stringify(data) }),
 };
@@ -137,6 +130,7 @@ export const examsAPI = {
   submit: (data: object) =>
     request("/exams/submit", { method: "POST", body: JSON.stringify(data) }),
   getMyResult: (examId: string) => request(`/exams/my-result/${examId}`),
+  getResults: (examId: string) => request(`/exams/results/${examId}`),
   // Essay Review
   getForReview: (examId: string) => request(`/exams/review/${examId}`),
   submitReview: (data: object) =>
@@ -166,22 +160,21 @@ export const notificationsAPI = {
 // ====== Upload ======
 export const uploadAPI = {
   image: async (file: File): Promise<string> => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-    const formData = new FormData()
-    formData.append("file", file)
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const formData = new FormData();
+    formData.append("file", file);
     const res = await fetch(`${BASE_URL}/upload/image`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
-    })
+    });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.detail || "فشل رفع الصورة")
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "فشل رفع الصورة");
     }
-    const data = await res.json()
-    // حوّل الـ path النسبي لـ URL كامل
-    const base = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1").replace("/api/v1", "")
-    return data.url.startsWith("http") ? data.url : `${base}${data.url}`
+    const data = await res.json();
+    const base = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1").replace("/api/v1", "");
+    return data.url.startsWith("http") ? data.url : `${base}${data.url}`;
   },
 };
 
@@ -217,7 +210,10 @@ export const usersAPI = {
     request(`/users/parent/${phone}`),
   deleteStudent: (id: string) =>
     request(`/users/${id}`, { method: "DELETE" }),
+  forceLogout: (id: string) =>
+    request(`/users/${id}/force-logout`, { method: "POST" }),
 };
+
 // ====== Stats ======
 export const statsAPI = {
   getOverview: () => request("/stats/overview"),
@@ -225,6 +221,7 @@ export const statsAPI = {
   getRecentStudents: () => request("/stats/recent-students"),
   getExamStats: (examId: string) => request(`/stats/exam/${examId}`),
 };
+
 // ====== Assignments ======
 export const assignmentsAPI = {
   create: (data: object) =>
@@ -243,5 +240,4 @@ export const assignmentsAPI = {
     request("/assignments/my-submissions"),
   delete: (id: string) =>
     request(`/assignments/${id}`, { method: "DELETE" }),
-  getResults: (examId: string) => request(`/exams/results/${examId}`),
 };
