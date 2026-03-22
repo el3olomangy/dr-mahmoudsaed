@@ -3,7 +3,7 @@ from typing import List
 from bson import ObjectId
 from datetime import datetime, timezone
 from ...core.database import get_db
-from ...core.dependencies import get_current_user, get_current_teacher
+from ...core.dependencies import get_current_user, get_current_teacher, get_current_teacher_or_assistant
 from ...schemas.notification import NotificationCreate, NotificationResponse, NotificationType
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -19,7 +19,7 @@ def notification_helper(n, user_id: str) -> dict:
     }
 
 @router.post("/", status_code=201)
-async def create_notification(data: NotificationCreate, current_user=Depends(get_current_teacher), db=Depends(get_db)):
+async def create_notification(data: NotificationCreate, current_user=Depends(get_current_teacher_or_assistant), db=Depends(get_db)):
     notif_doc = {
         "title": data.title,
         "body": data.body,

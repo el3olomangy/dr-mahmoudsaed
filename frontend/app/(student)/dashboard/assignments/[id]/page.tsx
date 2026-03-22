@@ -46,28 +46,25 @@ export default function AssignmentPage({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // جيب بيانات الواجب
-        const assignments = (await assignmentsAPI.getByLecture("")) as Assignment[]
-        // جيب تسليماتي وشوف لو سلمت الواجب ده قبل كده
+        // جيب تسليماتي الأول وشوف لو سلمت الواجب ده
         try {
           const mySubmissions = (await assignmentsAPI.getMySubmissions()) as any[]
           const existing = mySubmissions.find(s => s.assignment_id === assignmentId)
           if (existing) {
             setMySubmission(existing)
+            // جيب تفاصيل الواجب كمان عشان نعرض الاسم
+            try {
+              const a = await assignmentsAPI.getOne(assignmentId) as Assignment
+              setAssignment(a)
+            } catch {}
             setPageState("already_done")
             return
           }
         } catch {}
 
-        // جيب تفاصيل الواجب من الـ lecture
-        const allAssignments = (await assignmentsAPI.getByLecture(assignmentId)) as Assignment[]
-        const found = allAssignments.find(a => a.id === assignmentId)
-        if (found) {
-          setAssignment(found)
-        } else {
-          // حاول تجيبه بطريقة تانية
-          setAssignment({ id: assignmentId, title: "الواجب", description: "", created_at: "" })
-        }
+        // جيب تفاصيل الواجب
+        const a = await assignmentsAPI.getOne(assignmentId) as Assignment
+        setAssignment(a)
         setPageState("form")
       } catch (err: any) {
         setErrorMsg(err.message || "حصل خطأ في تحميل الواجب")

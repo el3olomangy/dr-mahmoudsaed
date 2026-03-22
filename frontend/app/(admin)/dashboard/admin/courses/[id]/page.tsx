@@ -23,6 +23,7 @@ import {
   FileCheck, AlertCircle, GripVertical, BookOpen, Pencil, Calendar, Upload, X,
 } from "lucide-react"
 import { coursesAPI, examsAPI, uploadAPI } from "@/lib/api"
+import { useAuth } from "@/context/AuthContext"
 import { getImageUrl } from "@/lib/utils/image"
 
 // ====== Types ======
@@ -43,6 +44,9 @@ interface ExamSummary {
 }
 
 const grades = [
+  { value: "first_preparatory", label: "أولى إعدادي" },
+  { value: "second_preparatory", label: "ثانية إعدادي" },
+  { value: "third_preparatory", label: "ثالثة إعدادي" },
   { value: "first_secondary", label: "أولى ثانوي" },
   { value: "second_secondary", label: "ثانية ثانوي" },
   { value: "third_secondary", label: "ثالثة ثانوي" },
@@ -73,7 +77,7 @@ function EditCourseDialog({ course, onSaved }: { course: Course; onSaved: (c: Pa
     if (!file) return
     setIsUploading(true)
     try {
-      const url = await uploadAPI.image(file)
+      const { url } = await uploadAPI.image(file)
       setForm(p => ({ ...p, thumbnail: url }))
     } catch (ex: any) { setErr(ex.message || "فشل رفع الصورة") }
     finally { setIsUploading(false); if (fileRef.current) fileRef.current.value = "" }
@@ -86,10 +90,10 @@ function EditCourseDialog({ course, onSaved }: { course: Course; onSaved: (c: Pa
     try {
       await coursesAPI.update(course.id, {
         title: form.title.trim(),
-        description: form.description || null,
+        description: form.description || undefined,
         grade: form.grade,
-        price: form.price ? Number(form.price) : null,
-        thumbnail: form.thumbnail || null,
+        price: form.price ? Number(form.price) : undefined,
+        thumbnail: form.thumbnail || undefined,
       })
       onSaved({ title: form.title.trim(), description: form.description, grade: form.grade })
       setOpen(false)
@@ -214,10 +218,10 @@ function AddLectureDialog({ courseId, unitId, order, onAdded }: {
     setLoading(true); setErr("")
     try {
       const lec = await coursesAPI.createLecture(courseId, unitId, {
-        title: form.title.trim(), description: form.description || null,
-        video_url: form.video_url.trim(), pdf_url: form.pdf_url || null,
+        title: form.title.trim(), description: form.description || undefined,
+        video_url: form.video_url.trim(), pdf_url: form.pdf_url || undefined,
         order, lecture_type: form.lecture_type,
-        duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
+        duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
       }) as Lecture
       onAdded(lec)
       setForm({ title: "", description: "", video_url: "", pdf_url: "", lecture_type: "paid", duration_minutes: "" })
@@ -314,55 +318,59 @@ function EditLectureDialog({ courseId, unitId, lecture, onSaved }: {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button className="p-1.5 rounded hover:bg-muted transition-colors shrink-0" title="تعديل المحاضرة">
-          <Pencil className="w-4 h-4 text-muted-foreground" />
-        </button>
-      </DialogTrigger>
-      <DialogContent dir="rtl" className="max-w-lg">
-        <DialogHeader><DialogTitle>تعديل المحاضرة</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="space-y-2">
-            <Label>عنوان المحاضرة *</Label>
-            <Input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} required />
-          </div>
-          <div className="space-y-2">
-            <Label>رابط الفيديو</Label>
-            <Input dir="ltr" value={form.video_url} onChange={e => setForm(p => ({ ...p, video_url: e.target.value }))} />
-          </div>
-          <div className="space-y-2">
-            <Label>رابط PDF</Label>
-            <Input dir="ltr" value={form.pdf_url} onChange={e => setForm(p => ({ ...p, pdf_url: e.target.value }))} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+    <>
+      <button
+        className="p-1.5 rounded hover:bg-muted transition-colors shrink-0"
+        title="تعديل المحاضرة"
+        onClick={e => { e.stopPropagation(); setOpen(true) }}
+      >
+        <Pencil className="w-4 h-4 text-muted-foreground" />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent dir="rtl" className="max-w-lg">
+          <DialogHeader><DialogTitle>تعديل المحاضرة</DialogTitle></DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
             <div className="space-y-2">
-              <Label>النوع</Label>
-              <Select value={form.lecture_type} onValueChange={v => setForm(p => ({ ...p, lecture_type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="paid">مدفوع</SelectItem>
-                  <SelectItem value="free">مجاني</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>عنوان المحاضرة *</Label>
+              <Input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} required />
             </div>
             <div className="space-y-2">
-              <Label>المدة (دقيقة)</Label>
-              <Input type="number" min="1" value={form.duration_minutes} onChange={e => setForm(p => ({ ...p, duration_minutes: e.target.value }))} />
+              <Label>رابط الفيديو</Label>
+              <Input dir="ltr" value={form.video_url} onChange={e => setForm(p => ({ ...p, video_url: e.target.value }))} />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>الوصف</Label>
-            <Textarea rows={2} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
-          </div>
-          <Err msg={err} />
-          <div className="flex gap-3">
-            <Button type="submit" className="flex-1" disabled={loading}>{loading ? "جاري الحفظ..." : "حفظ التعديلات"}</Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <div className="space-y-2">
+              <Label>رابط PDF</Label>
+              <Input dir="ltr" value={form.pdf_url} onChange={e => setForm(p => ({ ...p, pdf_url: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>النوع</Label>
+                <Select value={form.lecture_type} onValueChange={v => setForm(p => ({ ...p, lecture_type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="paid">مدفوع</SelectItem>
+                    <SelectItem value="free">مجاني</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>المدة (دقيقة)</Label>
+                <Input type="number" min="1" value={form.duration_minutes} onChange={e => setForm(p => ({ ...p, duration_minutes: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>الوصف</Label>
+              <Textarea rows={2} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
+            </div>
+            <Err msg={err} />
+            <div className="flex gap-3">
+              <Button type="submit" className="flex-1" disabled={loading}>{loading ? "جاري الحفظ..." : "حفظ التعديلات"}</Button>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -420,7 +428,7 @@ function AddExamDialog({ courseId, lectureId, onAdded }: {
         ? new Date(`${scheduleDate}T${scheduleTime}:00`).toISOString()
         : null
       await examsAPI.create({
-        title: form.title.trim(), course_id: courseId, lecture_id: lectureId || null,
+        title: form.title.trim(), course_id: courseId, lecture_id: lectureId || undefined,
         duration_minutes: Number(form.duration_minutes), pass_score: Number(form.pass_score),
         show_result_immediately: form.show_result_immediately,
         scheduled_at,
@@ -439,13 +447,17 @@ function AddExamDialog({ courseId, lectureId, onAdded }: {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-chart-4 hover:text-chart-4">
-          <FileCheck className="w-4 h-4 ml-1" /> اختبار
-        </Button>
-      </DialogTrigger>
-      <DialogContent dir="rtl" className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-chart-4 hover:text-chart-4"
+        onClick={e => { e.stopPropagation(); setOpen(true) }}
+      >
+        <FileCheck className="w-4 h-4 ml-1" /> اختبار
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent dir="rtl" className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{lectureId ? "إضافة اختبار للمحاضرة" : "إضافة اختبار للكورس"}</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6 mt-2">
           <div className="space-y-4 p-4 bg-muted/50 rounded-xl">
@@ -551,6 +563,7 @@ function AddExamDialog({ courseId, lectureId, onAdded }: {
         </form>
       </DialogContent>
     </Dialog>
+    </>
   )
 }
 
@@ -568,10 +581,13 @@ function EditExamButton({ examId }: { examId: string }) {
   )
 }
 
+
 // ====== Main Page ======
 export default function AdminCourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: courseId } = use(params)
   const router = useRouter()
+  const { user } = useAuth()
+  const isTeacher = user?.role === "teacher"
   const [course, setCourse] = useState<Course | null>(null)
   const [exams, setExams] = useState<ExamSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -703,6 +719,7 @@ export default function AdminCourseDetailPage({ params }: { params: Promise<{ id
           <EditCourseDialog course={course} onSaved={data => setCourse(prev => prev ? { ...prev, ...data } : prev)} />
           <AddUnitDialog courseId={courseId} order={course.units.length + 1} onAdded={handleUnitAdded} />
           <AddExamDialog courseId={courseId} onAdded={fetchExams} />
+          {isTeacher && (
           <Button
             variant="ghost"
             size="sm"
@@ -711,6 +728,7 @@ export default function AdminCourseDetailPage({ params }: { params: Promise<{ id
           >
             <Trash2 className="w-4 h-4 ml-1" /> حذف الكورس
           </Button>
+          )}
         </div>
       </div>
 
@@ -765,8 +783,8 @@ export default function AdminCourseDetailPage({ params }: { params: Promise<{ id
             return (
               <Card key={unit.id} className="overflow-hidden">
                 <AccordionItem value={unit.id} className="border-none">
-                  <AccordionTrigger className="px-6 py-4 hover:bg-muted/30 hover:no-underline">
-                    <div className="flex items-center justify-between w-full pl-2">
+                  <div className="flex items-center px-6 py-4 hover:bg-muted/30">
+                    <AccordionTrigger className="flex-1 hover:no-underline p-0 hover:bg-transparent">
                       <div className="flex items-center gap-3">
                         <GripVertical className="w-4 h-4 text-muted-foreground" />
                         <div className="text-right">
@@ -774,15 +792,17 @@ export default function AdminCourseDetailPage({ params }: { params: Promise<{ id
                           <p className="text-xs text-muted-foreground mt-0.5">{unit.lectures.length} محاضرة</p>
                         </div>
                       </div>
+                    </AccordionTrigger>
+                    {isTeacher && (
                       <button
-                        onClick={e => { e.stopPropagation(); handleDeleteUnit(unit.id) }}
-                        className="p-1.5 rounded hover:bg-destructive/10 transition-colors shrink-0"
+                        onClick={() => handleDeleteUnit(unit.id)}
+                        className="p-1.5 rounded hover:bg-destructive/10 transition-colors shrink-0 mr-2"
                         title="حذف الوحدة"
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </button>
-                    </div>
-                  </AccordionTrigger>
+                    )}
+                  </div>
                   <AccordionContent className="pb-0">
                     <div className="border-t border-border">
 
@@ -793,10 +813,10 @@ export default function AdminCourseDetailPage({ params }: { params: Promise<{ id
                           return (
                             <AccordionItem key={lec.id} value={`lec-${lec.id}`} className="border-t border-border/60">
 
-                              {/* هيدر المحاضرة */}
-                              <AccordionTrigger className="px-6 py-3 hover:bg-muted/40 hover:no-underline">
-                                <div className="flex items-center justify-between w-full pl-2">
-                                  <div className="flex items-center gap-3 text-right min-w-0">
+                              {/* هيدر المحاضرة — نفصل الأزرار عن الـ trigger */}
+                              <div className="flex items-center px-6 py-3 hover:bg-muted/40">
+                                <AccordionTrigger className="flex-1 hover:no-underline p-0 hover:bg-transparent">
+                                  <div className="flex items-center gap-3 text-right min-w-0 w-full">
                                     {lec.video_url
                                       ? <PlayCircle className="w-4 h-4 text-primary shrink-0" />
                                       : <FileText className="w-4 h-4 text-secondary shrink-0" />}
@@ -820,12 +840,14 @@ export default function AdminCourseDetailPage({ params }: { params: Promise<{ id
                                       </div>
                                     </div>
                                   </div>
-                                  {/* أزرار المحاضرة فقط */}
-                                  <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                                    <EditLectureDialog
-                                      courseId={courseId} unitId={unit.id} lecture={lec}
-                                      onSaved={updated => handleLectureUpdated(unit.id, updated)}
-                                    />
+                                </AccordionTrigger>
+                                {/* أزرار المحاضرة — بره الـ AccordionTrigger */}
+                                <div className="flex items-center gap-1 shrink-0 mr-2">
+                                  <EditLectureDialog
+                                    courseId={courseId} unitId={unit.id} lecture={lec}
+                                    onSaved={updated => handleLectureUpdated(unit.id, updated)}
+                                  />
+                                  {isTeacher && (
                                     <button
                                       onClick={() => handleDeleteLecture(unit.id, lec.id)}
                                       className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
@@ -833,9 +855,9 @@ export default function AdminCourseDetailPage({ params }: { params: Promise<{ id
                                     >
                                       <Trash2 className="w-4 h-4 text-destructive" />
                                     </button>
-                                  </div>
+                                  )}
                                 </div>
-                              </AccordionTrigger>
+                              </div>
 
                               {/* محتوى المحاضرة */}
                               <AccordionContent className="pb-0">
@@ -877,6 +899,7 @@ export default function AdminCourseDetailPage({ params }: { params: Promise<{ id
                                       </div>
                                       <div className="flex items-center gap-1 shrink-0">
                                         <EditExamButton examId={lecExam.id} />
+                                        {isTeacher && (
                                         <button
                                           onClick={() => handleDeleteExam(lecExam.id)}
                                           className="p-1 rounded hover:bg-destructive/10 transition-colors"
@@ -884,6 +907,7 @@ export default function AdminCourseDetailPage({ params }: { params: Promise<{ id
                                         >
                                           <Trash2 className="w-3.5 h-3.5 text-destructive" />
                                         </button>
+                                        )}
                                       </div>
                                     </div>
                                   ) : (

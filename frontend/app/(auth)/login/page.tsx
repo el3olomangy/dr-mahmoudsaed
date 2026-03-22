@@ -234,7 +234,7 @@ export default function LoginPage() {
               className="object-contain"
             />
           </div>
-          <h2 className="text-3xl font-extrabold text-white mb-4">أهلاً بيك في العلومنجي</h2>
+          <h2 className="text-3xl font-extrabold text-white mb-4">أهلاً بيك في في منصة العلومنجي</h2>
           <p className="text-white/80 text-lg max-w-sm mx-auto">منصتك التعليمية المتكاملة مع د. محمود سعيد</p>
         </div>
       </div>

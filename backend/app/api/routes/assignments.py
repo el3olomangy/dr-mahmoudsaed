@@ -84,6 +84,21 @@ async def get_assignments_by_course(
     return [assignment_helper(a) for a in assignments]
 
 
+# ====== جيب واجب واحد بالـ ID ======
+
+@router.get("/single/{assignment_id}")
+async def get_assignment_by_id(
+    assignment_id: str,
+    current_user=Depends(get_current_user),
+    db=Depends(get_db)
+):
+    oid = validate_object_id(assignment_id)
+    assignment = await db.assignments.find_one({"_id": oid})
+    if not assignment:
+        raise HTTPException(status_code=404, detail="الواجب مش موجود")
+    return assignment_helper(assignment)
+
+
 # ====== تسليم واجب (الطالب) ======
 
 @router.post("/submit")
@@ -113,6 +128,29 @@ async def submit_assignment(
 
     doc = submission_doc(data.assignment_id, student_id, data.text_answer)
     result = await db.assignment_submissions.insert_one(doc)
+
+    # سجّل النشاط
+    try:
+        student = await db.users.find_one({"_id": ObjectId(student_id)})
+        if student:
+            parent_phone = student.get("parent_phone")
+            student_name = f"{student['first_name']} {student['last_name']}"
+            assignment_title = assignment.get("title", "واجب")
+            await db.activity_log.insert_one({
+                "student_id": student_id,
+                "student_name": student_name,
+                "parent_phone": parent_phone,
+                "activity_type": "assignment_submitted",
+                "details": {
+                    "assignment_id": data.assignment_id,
+                    "assignment_title": assignment_title,
+                    "message": f"سلّم واجب: {assignment_title}",
+                },
+                "created_at": datetime.now(timezone.utc),
+            })
+    except Exception:
+        pass
+
     return {"id": str(result.inserted_id), "message": "تم تسليم الواجب بنجاح"}
 
 

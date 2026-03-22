@@ -1,6 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { FloatingChemIcons } from "@/components/FloatingChemIcons"
 
 export function HeroSection() {
   return (
@@ -14,6 +15,9 @@ export function HeroSection() {
           backgroundSize: '600px',
         }}
       />
+
+      {/* الأيقونات الكيميائية الطائرة */}
+      <FloatingChemIcons />
       
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
@@ -62,7 +66,7 @@ export function HeroSection() {
                 width={500}
                 height={500}
                 className="w-full h-auto"
-                priority
+                loading="eager"
               />
               {/* Teacher Photo */}
               <Image 
@@ -71,7 +75,7 @@ export function HeroSection() {
                 width={450}
                 height={450}
                 className="absolute inset-0 w-full h-auto object-contain"
-                priority
+                loading="eager"
               />
             </div>
           </div>

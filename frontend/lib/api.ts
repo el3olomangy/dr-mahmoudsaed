@@ -235,16 +235,19 @@ export const examsAPI = {
 
   getOne: (examId: string) => request(`/exams/${examId}`),
 
-  getExamForAdmin: (examId: string) => request(`/exams/${examId}/admin`),
+  getExamForAdmin: (examId: string) => request(`/exams/admin/${examId}`),
 
   create: (data: {
     title: string
     course_id: string
     lecture_id?: string
+    unit_id?: string
     pass_score: number
     duration_minutes?: number
+    show_result_immediately?: boolean
     is_homework?: boolean
     deadline?: string
+    scheduled_at?: string | null
     questions: {
       text: string
       question_type: "mcq" | "essay"
@@ -279,7 +282,7 @@ export const examsAPI = {
       body: JSON.stringify(data),
     }),
 
-  getMyResult: (examId: string) => request(`/exams/${examId}/my-result`),
+  getMyResult: (examId: string) => request(`/exams/my-result/${examId}`),
 
   getResults: (examId: string) => request(`/exams/${examId}/results`),
 
@@ -335,6 +338,34 @@ export const usersAPI = {
 
   forceLogout: (userId: string) =>
     request(`/users/${userId}/force-logout`, { method: "POST" }),
+}
+
+// ============================================================
+// ASSISTANTS
+// ============================================================
+
+export const assistantsAPI = {
+  getAll: () => request("/users/assistants-list"),
+
+  create: (data: {
+    first_name: string
+    last_name: string
+    phone: string
+    password: string
+  }) =>
+    request("/users/assistants", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (userId: string) =>
+    request(`/users/${userId}`, { method: "DELETE" }),
+
+  resetPassword: (userId: string, newPassword: string) =>
+    request(`/users/${userId}/reset-password`, {
+      method: "PATCH",
+      body: JSON.stringify({ new_password: newPassword }),
+    }),
 }
 
 // ============================================================
@@ -402,6 +433,9 @@ export const notificationsAPI = {
 // ============================================================
 
 export const assignmentsAPI = {
+  getOne: (assignmentId: string) =>
+    request(`/assignments/single/${assignmentId}`),
+
   getByLecture: (lectureId: string) =>
     request(`/assignments/lecture/${lectureId}`),
 
@@ -466,18 +500,4 @@ export const uploadAPI = {
 
     return res.json()
   },
-}
-
-// ============================================================
-// GRADE IMAGES — صور المراحل الدراسية
-// ============================================================
-
-export const gradeImagesAPI = {
-  getAll: () => request("/grade-images/"),
-
-  update: (grade: string, imageUrl: string) =>
-    request(`/grade-images/${grade}`, {
-      method: "PATCH",
-      body: JSON.stringify({ image_url: imageUrl }),
-    }),
 }

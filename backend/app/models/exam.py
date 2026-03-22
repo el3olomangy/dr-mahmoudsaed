@@ -20,6 +20,7 @@ def exam_doc(data, questions_docs: list) -> dict:
     return {
         "title": data.title,
         "lecture_id": data.lecture_id,
+        "unit_id": getattr(data, "unit_id", None),
         "course_id": data.course_id,
         "duration_minutes": data.duration_minutes,
         "pass_score": data.pass_score,

@@ -8,9 +8,29 @@ from ...core.dependencies import get_current_user, get_current_teacher_or_assist
 router = APIRouter(prefix="/progress", tags=["Progress"])
 
 
+async def log_activity(db, student_id: str, activity_type: str, details: dict):
+    """سجّل نشاط الطالب في activity_log"""
+    try:
+        # جيب اسم الطالب
+        student = await db.users.find_one({"_id": ObjectId(student_id)})
+        student_name = f"{student['first_name']} {student['last_name']}" if student else "طالب"
+        parent_phone = student.get("parent_phone") if student else None
+
+        await db.activity_log.insert_one({
+            "student_id": student_id,
+            "student_name": student_name,
+            "parent_phone": parent_phone,
+            "activity_type": activity_type,  # lecture_watched | exam_submitted | assignment_submitted | exam_graded | assignment_graded
+            "details": details,
+            "created_at": datetime.now(timezone.utc),
+        })
+    except Exception:
+        pass  # النشاط اختياري — ما نوقفش الطلب لو فشل
+
+
 class VideoPosition(BaseModel):
-    position: float  # بالثواني
-    duration: float = 0  # مدة الفيديو الكاملة
+    position: float
+    duration: float = 0
 
 
 @router.post("/lecture/{lecture_id}/position")
@@ -22,6 +42,11 @@ async def save_video_position(
 ):
     """حفظ آخر موقف وصله الطالب في الفيديو"""
     user_id = str(current_user["_id"])
+    was_watched_before = False
+    existing = await db.lecture_progress.find_one({"user_id": user_id, "lecture_id": lecture_id})
+    if existing:
+        was_watched_before = existing.get("watched", False)
+
     watched = data.duration > 0 and data.position >= 120
     await db.lecture_progress.update_one(
         {"user_id": user_id, "lecture_id": lecture_id},
@@ -35,6 +60,17 @@ async def save_video_position(
         }},
         upsert=True,
     )
+
+    # سجّل النشاط لو الطالب خلّص المحاضرة لأول مرة
+    if watched and not was_watched_before:
+        lecture = await db.lectures.find_one({"_id": ObjectId(lecture_id)}) if ObjectId.is_valid(lecture_id) else None
+        lecture_title = lecture.get("title", "محاضرة") if lecture else "محاضرة"
+        await log_activity(db, user_id, "lecture_watched", {
+            "lecture_id": lecture_id,
+            "lecture_title": lecture_title,
+            "message": f"أتم مشاهدة محاضرة: {lecture_title}",
+        })
+
     return {"message": "تم حفظ الموقف"}
 
 
@@ -106,14 +142,21 @@ async def get_course_progress(
     watched_ids = [d["lecture_id"] for d in watched_docs]
     watched_count = len(watched_ids)
 
-    # إحصائيات الاختبارات
+    # إحصائيات الاختبارات — نفرّق بين الاختبارات والواجبات
+    all_exams = await db.exams.find({"course_id": course_id}).to_list(200)
+    all_exam_ids = [str(e["_id"]) for e in all_exams]
+    exam_ids_only = [str(e["_id"]) for e in all_exams if not e.get("is_homework", False)]
+
     exam_results = await db.exam_results.find({
         "student_id": user_id,
-        "exam_id": {"$in": [
-            str(e["_id"]) async for e in db.exams.find({"course_id": course_id})
-        ]},
+        "exam_id": {"$in": all_exam_ids},
     }).to_list(200)
-    passed = sum(1 for r in exam_results if r.get("passed"))
+
+    # الاختبارات العادية فقط (بدون الواجبات)
+    exams_only_results = [
+        r for r in exam_results if r["exam_id"] in exam_ids_only
+    ]
+    passed = sum(1 for r in exams_only_results if r.get("passed"))
 
     return {
         "watched": watched_count,
@@ -121,7 +164,7 @@ async def get_course_progress(
         "percentage": round(watched_count / total_lectures * 100) if total_lectures else 0,
         "watched_ids": watched_ids,
         "exam_stats": {
-            "taken": len(exam_results),
+            "taken": len(exams_only_results),
             "passed": passed,
         },
     }
@@ -149,20 +192,23 @@ async def get_student_course_progress(
     }).to_list(500)
     watched_count = len(watched_docs)
 
+    exam_results_all_exams = await db.exams.find({"course_id": course_id}).to_list(200)
+    all_exam_ids_s = [str(e["_id"]) for e in exam_results_all_exams]
+    exam_ids_only_s = [str(e["_id"]) for e in exam_results_all_exams if not e.get("is_homework", False)]
+
     exam_results = await db.exam_results.find({
         "student_id": student_id,
-        "exam_id": {"$in": [
-            str(e["_id"]) async for e in db.exams.find({"course_id": course_id})
-        ]},
+        "exam_id": {"$in": all_exam_ids_s},
     }).to_list(200)
-    passed = sum(1 for r in exam_results if r.get("passed"))
+    exams_only = [r for r in exam_results if r["exam_id"] in exam_ids_only_s]
+    passed = sum(1 for r in exams_only if r.get("passed"))
 
     return {
         "watched": watched_count,
         "total_lectures": total_lectures,
         "percentage": round(watched_count / total_lectures * 100) if total_lectures else 0,
         "exam_stats": {
-            "taken": len(exam_results),
+            "taken": len(exams_only),
             "passed": passed,
         },
     }
@@ -312,3 +358,38 @@ async def get_student_progress_for_parent(
         students_data.append(await build_student_data(s))
 
     return {"students": students_data}
+
+
+# ====== Activity Log لولي الأمر ======
+
+@router.get("/parent/{parent_phone}/activity")
+async def get_parent_activity(
+    parent_phone: str,
+    db=Depends(get_db)
+):
+    """جيب آخر 50 نشاط لأبناء ولي الأمر"""
+    students = await db.users.find(
+        {"parent_phone": parent_phone, "role": "student"}
+    ).to_list(20)
+
+    if not students:
+        raise HTTPException(status_code=404, detail="مفيش طالب مرتبط بالرقم ده")
+
+    student_ids = [str(s["_id"]) for s in students]
+
+    activities = await db.activity_log.find(
+        {"student_id": {"$in": student_ids}}
+    ).sort("created_at", -1).to_list(50)
+
+    result = []
+    for act in activities:
+        result.append({
+            "id": str(act["_id"]),
+            "student_id": act["student_id"],
+            "student_name": act.get("student_name", ""),
+            "activity_type": act["activity_type"],
+            "details": act.get("details", {}),
+            "created_at": act["created_at"],
+        })
+
+    return {"activities": result}

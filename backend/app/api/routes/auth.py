@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from pydantic import BaseModel
 from datetime import timedelta
+from slowapi import Limiter  # type: ignore
+from slowapi.util import get_remote_address  # type: ignore
 from ...core.database import get_db
 from ...core.security import (
     verify_password, get_password_hash,
@@ -15,6 +17,8 @@ from bson import ObjectId
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+limiter = Limiter(key_func=get_remote_address)
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -28,7 +32,8 @@ class ChangePasswordRequest(BaseModel):
 # ====== تسجيل حساب جديد ======
 
 @router.post("/register", response_model=UserResponse, status_code=201)
-async def register(data: UserRegister):
+@limiter.limit("5/minute")
+async def register(request: Request, data: UserRegister):
     db = get_db()
 
     # بنتحقق بس من رقم الطالب — رقم ولي الأمر مسموح يتكرر
@@ -55,7 +60,8 @@ async def register(data: UserRegister):
 # ====== تسجيل الدخول ======
 
 @router.post("/login", response_model=Token)
-async def login(data: UserLogin):
+@limiter.limit("10/minute")
+async def login(request: Request, data: UserLogin):
     db = get_db()
 
     user = await db.users.find_one({"phone": data.phone})
@@ -68,18 +74,18 @@ async def login(data: UserLogin):
     if not user.get("is_active"):
         raise HTTPException(status_code=403, detail="الحساب موقوف")
 
-    # Device Binding
-    if user.get("device_id") and user["device_id"] != data.device_id:
-        raise HTTPException(
-            status_code=403,
-            detail="الحساب مسجل على جهاز تاني — تواصل مع الدعم"
-        )
-
-    if not user.get("device_id"):
-        await db.users.update_one(
-            {"_id": user["_id"]},
-            {"$set": {"device_id": data.device_id}}
-        )
+    # Device Binding — للطلاب بس، الأدمن والمساعد يفتحوا من أي جهاز
+    if user["role"] == "student":
+        if user.get("device_id") and user["device_id"] != data.device_id:
+            raise HTTPException(
+                status_code=403,
+                detail="الحساب مسجل على جهاز تاني — تواصل مع الدعم"
+            )
+        if not user.get("device_id"):
+            await db.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"device_id": data.device_id}}
+            )
 
     token_data = {"sub": str(user["_id"]), "role": user["role"]}
     access_token = create_access_token(data=token_data)
@@ -104,7 +110,8 @@ async def login(data: UserLogin):
 # ====== تجديد الـ Access Token ======
 
 @router.post("/refresh")
-async def refresh_token(data: RefreshRequest):
+@limiter.limit("20/minute")
+async def refresh_token(request: Request, data: RefreshRequest):
     if await is_token_blacklisted(data.refresh_token):
         raise HTTPException(status_code=401, detail="Refresh token منتهي أو تم تسجيل الخروج")
 

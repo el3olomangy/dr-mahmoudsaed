@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -200,18 +202,18 @@ export default function RegisterPage() {
                     <SelectValue placeholder="اختر المرحلة" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="first_preparatory" disabled className="text-xs text-muted-foreground font-bold pointer-events-none">
-                      — الإعدادي —
-                    </SelectItem>
-                    <SelectItem value="first_preparatory">الصف الأول الإعدادي</SelectItem>
-                    <SelectItem value="second_preparatory">الصف الثاني الإعدادي</SelectItem>
-                    <SelectItem value="third_preparatory">الصف الثالث الإعدادي</SelectItem>
-                    <SelectItem value="first_secondary" disabled className="text-xs text-muted-foreground font-bold pointer-events-none">
-                      — الثانوي —
-                    </SelectItem>
-                    <SelectItem value="first_secondary">الصف الأول الثانوي</SelectItem>
-                    <SelectItem value="second_secondary">الصف الثاني الثانوي</SelectItem>
-                    <SelectItem value="third_secondary">الصف الثالث الثانوي</SelectItem>
+                    <SelectGroup>
+                      <SelectLabel className="text-xs text-muted-foreground">— الإعدادي —</SelectLabel>
+                      <SelectItem value="first_preparatory">الصف الأول الإعدادي</SelectItem>
+                      <SelectItem value="second_preparatory">الصف الثاني الإعدادي</SelectItem>
+                      <SelectItem value="third_preparatory">الصف الثالث الإعدادي</SelectItem>
+                    </SelectGroup>
+                    <SelectGroup>
+                      <SelectLabel className="text-xs text-muted-foreground">— الثانوي —</SelectLabel>
+                      <SelectItem value="first_secondary">الصف الأول الثانوي</SelectItem>
+                      <SelectItem value="second_secondary">الصف الثاني الثانوي</SelectItem>
+                      <SelectItem value="third_secondary">الصف الثالث الثانوي</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>

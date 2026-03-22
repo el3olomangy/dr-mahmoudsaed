@@ -118,6 +118,7 @@ async def get_course_exams(course_id: str, current_user=Depends(get_current_user
         "title": e["title"],
         "duration_minutes": e["duration_minutes"],
         "lecture_id": e.get("lecture_id"),
+        "unit_id": e.get("unit_id"),
         "pass_score": e.get("pass_score", 50),
         "scheduled_at": e.get("scheduled_at"),
         "is_homework": e.get("is_homework", False),

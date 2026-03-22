@@ -27,7 +27,27 @@ def course_helper(course, enrolled_ids=[], is_enrolled=False) -> dict:
 @router.get("/", response_model=List[CourseListItem])
 async def get_courses(current_user=Depends(get_current_user), db=Depends(get_db)):
     enrolled = [str(c) for c in current_user.get("enrolled_courses", [])]
-    courses = await db.courses.find().to_list(100)
+
+    # المدرس والمساعد يشوفوا كل الكورسات
+    # الطالب يشوف كورسات مرحلته بس + الكورسات اللي هو مشترك فيها
+    if current_user.get("role") in ["teacher", "assistant"]:
+        query = {}
+    else:
+        student_grade = current_user.get("grade")
+        enrolled_oids = [
+            ObjectId(c) for c in enrolled if ObjectId.is_valid(c)
+        ]
+        if student_grade:
+            query = {
+                "$or": [
+                    {"grade": student_grade},
+                    {"_id": {"$in": enrolled_oids}},
+                ]
+            }
+        else:
+            query = {}  # لو مفيش grade — يشوف الكل
+
+    courses = await db.courses.find(query).to_list(100)
     return [course_helper(c, enrolled) for c in courses]
 
 @router.get("/{course_id}", response_model=CourseResponse)

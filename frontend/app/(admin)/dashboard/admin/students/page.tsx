@@ -11,6 +11,7 @@ import {
   BookOpen, PlayCircle, FileCheck, LogOut, Lock, X,
 } from "lucide-react";
 import { usersAPI, progressAPI, coursesAPI } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 interface Student {
   id: string;
@@ -30,6 +31,8 @@ const gradeLabels: Record<string, string> = {
 };
 
 export default function StudentsPage() {
+  const { user } = useAuth();
+  const isTeacher = user?.role === "teacher";
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -323,19 +326,21 @@ export default function StudentsPage() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        size="sm"
-                        variant={student.is_active ? "destructive" : "default"}
-                        className={student.is_active ? "" : "bg-chart-3 hover:bg-chart-3/90 text-white"}
-                        disabled={loadingAction === `toggle-${student.id}`}
-                        onClick={() => handleToggleActive(student.id)}
-                      >
-                        {loadingAction === `toggle-${student.id}` ? "..." : student.is_active ? (
-                          <><XCircle className="w-4 h-4 ml-1" />إيقاف</>
-                        ) : (
-                          <><CheckCircle className="w-4 h-4 ml-1" />تفعيل</>
-                        )}
-                      </Button>
+                      {isTeacher && (
+                        <Button
+                          size="sm"
+                          variant={student.is_active ? "destructive" : "default"}
+                          className={student.is_active ? "" : "bg-chart-3 hover:bg-chart-3/90 text-white"}
+                          disabled={loadingAction === `toggle-${student.id}`}
+                          onClick={() => handleToggleActive(student.id)}
+                        >
+                          {loadingAction === `toggle-${student.id}` ? "..." : student.is_active ? (
+                            <><XCircle className="w-4 h-4 ml-1" />إيقاف</>
+                          ) : (
+                            <><CheckCircle className="w-4 h-4 ml-1" />تفعيل</>
+                          )}
+                        </Button>
+                      )}
 
                       <Button
                         size="sm"
@@ -427,30 +432,34 @@ export default function StudentsPage() {
 
                       {/* Action Buttons */}
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-blue-300 text-blue-600 hover:bg-blue-50"
-                          onClick={() => {
-                            setResetPwDialog({ id: student.id, name: `${student.first_name} ${student.last_name}` });
-                            setNewPassword("");
-                            setResetPwError("");
-                            setResetPwSuccess(false);
-                          }}
-                        >
-                          <Lock className="w-4 h-4 ml-2" />
-                          تغيير الباسورد
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                          disabled={loadingAction === `reset-${student.id}`}
-                          onClick={() => handleResetDevice(student.id)}
-                        >
-                          <Smartphone className="w-4 h-4 ml-2" />
-                          {loadingAction === `reset-${student.id}` ? "جاري الـ reset..." : "Reset الجهاز"}
-                        </Button>
+                        {isTeacher && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                            onClick={() => {
+                              setResetPwDialog({ id: student.id, name: `${student.first_name} ${student.last_name}` });
+                              setNewPassword("");
+                              setResetPwError("");
+                              setResetPwSuccess(false);
+                            }}
+                          >
+                            <Lock className="w-4 h-4 ml-2" />
+                            تغيير الباسورد
+                          </Button>
+                        )}
+                        {isTeacher && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                            disabled={loadingAction === `reset-${student.id}`}
+                            onClick={() => handleResetDevice(student.id)}
+                          >
+                            <Smartphone className="w-4 h-4 ml-2" />
+                            {loadingAction === `reset-${student.id}` ? "جاري الـ reset..." : "Reset الجهاز"}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -461,15 +470,17 @@ export default function StudentsPage() {
                           <LogOut className="w-4 h-4 ml-2" />
                           {loadingAction === `logout-${student.id}` ? "جاري الطرد..." : "تسجيل خروج إجباري"}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={loadingAction === `delete-${student.id}`}
-                          onClick={() => handleDeleteStudent(student.id, `${student.first_name} ${student.last_name}`)}
-                        >
-                          <Trash2 className="w-4 h-4 ml-2" />
-                          {loadingAction === `delete-${student.id}` ? "جاري الحذف..." : "حذف الحساب"}
-                        </Button>
+                        {isTeacher && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={loadingAction === `delete-${student.id}`}
+                            onClick={() => handleDeleteStudent(student.id, `${student.first_name} ${student.last_name}`)}
+                          >
+                            <Trash2 className="w-4 h-4 ml-2" />
+                            {loadingAction === `delete-${student.id}` ? "جاري الحذف..." : "حذف الحساب"}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}

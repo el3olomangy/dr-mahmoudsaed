@@ -50,6 +50,7 @@ class ExamResult(BaseModel):
 class ExamCreate(BaseModel):
     title: str = Field(..., min_length=3)
     lecture_id: Optional[str] = None
+    unit_id: Optional[str] = None
     course_id: str
     duration_minutes: int = Field(default=30, ge=5)
     pass_score: int = Field(default=50, ge=0, le=100)

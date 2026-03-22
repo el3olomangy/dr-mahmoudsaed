@@ -36,25 +36,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // تحميل البيانات من localStorage عند بدء التطبيق
   useEffect(() => {
-    try {
-      const savedToken = localStorage.getItem("token")
-      const savedUser = localStorage.getItem("user")
+    const init = async () => {
+      try {
+        const savedToken = localStorage.getItem("token")
+        const savedUser = localStorage.getItem("user")
 
-      if (savedToken && savedUser) {
-        const parsedUser = JSON.parse(savedUser)
-        setToken(savedToken)
-        setUser(parsedUser)
-        // sync الـ cookies عشان الـ middleware يشتغل صح
-        document.cookie = `token=${savedToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
-        document.cookie = `user_role=${parsedUser.role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+        if (savedToken && savedUser) {
+          const parsedUser = JSON.parse(savedUser)
+          setToken(savedToken)
+          setUser(parsedUser)
+          document.cookie = `token=${savedToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+          document.cookie = `user_role=${parsedUser.role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+
+          // جيب أحدث بيانات المستخدم من الـ API (خصوصاً enrolled_courses)
+          try {
+            const res = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"}/auth/me`,
+              { headers: { Authorization: `Bearer ${savedToken}` } }
+            )
+            if (res.ok) {
+              const freshUser = await res.json()
+              const updatedUser = { ...parsedUser, ...freshUser }
+              localStorage.setItem("user", JSON.stringify(updatedUser))
+              setUser(updatedUser)
+            }
+          } catch {}
+        }
+      } catch (error) {
+        localStorage.removeItem("token")
+        localStorage.removeItem("user")
+      } finally {
+        setIsLoading(false)
       }
-    } catch (error) {
-      // لو البيانات corrupt نمسحها
-      localStorage.removeItem("token")
-      localStorage.removeItem("user")
-    } finally {
-      setIsLoading(false)
     }
+    init()
   }, [])
 
   const login = useCallback((newToken: string, newUser: User, refreshToken?: string) => {

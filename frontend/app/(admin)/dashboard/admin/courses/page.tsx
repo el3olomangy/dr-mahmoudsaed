@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { BookOpen, Plus, RefreshCw, PlayCircle, Upload, X } from "lucide-react"
 import Link from "next/link"
 import { coursesAPI, uploadAPI } from "@/lib/api"
+import { useAuth } from "@/context/AuthContext"
 import { getImageUrl } from "@/lib/utils/image"
 
 interface Course {
@@ -38,12 +39,17 @@ interface Course {
 }
 
 const grades = [
+  { value: "first_preparatory", label: "أولى إعدادي" },
+  { value: "second_preparatory", label: "ثانية إعدادي" },
+  { value: "third_preparatory", label: "ثالثة إعدادي" },
   { value: "first_secondary", label: "أولى ثانوي" },
   { value: "second_secondary", label: "ثانية ثانوي" },
   { value: "third_secondary", label: "ثالثة ثانوي" },
 ]
 
 export default function AdminCoursesPage() {
+  const { user } = useAuth()
+  const isTeacher = user?.role === "teacher"
   const [courses, setCourses] = useState<Course[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
@@ -76,7 +82,7 @@ export default function AdminCoursesPage() {
     if (!file) return
     setIsUploading(true)
     try {
-      const url = await uploadAPI.image(file)
+      const { url } = await uploadAPI.image(file)
       setForm(p => ({ ...p, thumbnail: url }))
     } catch (err: any) {
       setFormError(err.message || "فشل رفع الصورة")
@@ -97,10 +103,10 @@ export default function AdminCoursesPage() {
     try {
       const newCourse: any = await coursesAPI.create({
         title: form.title,
-        description: form.description || null,
+        description: form.description || undefined,
         grade: form.grade,
-        price: form.price ? Number(form.price) : null,
-        thumbnail: form.thumbnail || null,
+        price: form.price ? Number(form.price) : undefined,
+        thumbnail: form.thumbnail || undefined,
       })
       setCourses(prev => [newCourse, ...prev])
       setIsDialogOpen(false)
@@ -127,6 +133,7 @@ export default function AdminCoursesPage() {
             تحديث
           </Button>
 
+          {isTeacher && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -184,7 +191,7 @@ export default function AdminCoursesPage() {
                       if (!file) return
                       setIsUploading(true)
                       try {
-                        const url = await uploadAPI.image(file)
+                        const { url } = await uploadAPI.image(file)
                         setForm(p => ({ ...p, thumbnail: url }))
                       } catch (err: any) {
                         setFormError(err.message || "فشل رفع الصورة")
@@ -251,6 +258,7 @@ export default function AdminCoursesPage() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -278,10 +286,12 @@ export default function AdminCoursesPage() {
           <CardContent className="py-16 text-center">
             <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground mb-4">مفيش كورسات لسه</p>
+            {isTeacher && (
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => setIsDialogOpen(true)}>
               <Plus className="w-4 h-4 ml-2" />
               أضف أول كورس
             </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

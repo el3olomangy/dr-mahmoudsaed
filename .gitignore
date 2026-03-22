@@ -1,58 +1,129 @@
-# ===========================
-# 🔐 Environment & Secrets
-# ===========================
+# ============================================================
+# .gitignore — منصة العلومنجي
+# ============================================================
+
+
+# ============================================================
+# SECRETS — لا ترفعهم أبدًا ⚠️
+# ============================================================
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.secret
 backend/.env
+frontend/.env.local
+frontend/.env*.local
 
-# ===========================
-# 🐍 Python / Backend
-# ===========================
+
+# ============================================================
+# PYTHON — الباك إند
+# ============================================================
+
+# Bytecode
 __pycache__/
 *.py[cod]
+*$py.class
 *.pyc
 *.pyo
-*.pyd
-.Python
 
-# Virtual environments
+# Virtual environment
 venv/
 env/
 .venv/
 backend/venv/
+backend/env/
 
-# ===========================
-# 📦 Node / Frontend
-# ===========================
+# Distribution
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking
+.mypy_cache/
+.ruff_cache/
+
+
+# ============================================================
+# NODE / FRONTEND
+# ============================================================
+
+# Dependencies
 node_modules/
 frontend/node_modules/
 
 # Next.js
+.next/
 frontend/.next/
+out/
 frontend/out/
+
+# Build
+dist/
+build/
+frontend/dist/
 frontend/build/
-frontend/.vercel/
 
-# ===========================
-# 🛠️ IDE / Editor
-# ===========================
+# Cache
+.npm/
+.yarn/
+
+# Type declarations (auto-generated)
+frontend/next-env.d.ts
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript build info
+*.tsbuildinfo
+
+
+# ============================================================
+# UPLOADED FILES — ملفات المستخدمين
+# ============================================================
+backend/static/images/
+backend/uploads/
+uploads/
+
+
+# ============================================================
+# EDITOR & OS
+# ============================================================
+
+# VSCode
 .vscode/
-.idea/
-*.swp
-*.swo
+!.vscode/extensions.json
 
-# ===========================
-# 💻 OS Files
-# ===========================
+# JetBrains
+.idea/
+
+# macOS
 .DS_Store
+.AppleDouble
+
+# Windows
 Thumbs.db
 desktop.ini
 
-# ===========================
-# 📄 Misc
-# ===========================
-structure.txt
+# Linux
+*~
+
+
+# ============================================================
+# MISCELLANEOUS
+# ============================================================
 *.log
+logs/
 *.tmp
-package-lock.json
+*.swp
+*.bak
+structure.txt

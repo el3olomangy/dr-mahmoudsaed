@@ -11,19 +11,19 @@ import { Button } from "@/components/ui/button"
 import {
   LayoutDashboard, Users, BookOpen, KeyRound, Bell, LogOut,
   Menu, ChevronLeft, ClipboardList, FileText, ClipboardCheck,
-  Sun, Moon,
+  Sun, Moon, UserCog,
 } from "lucide-react"
 
 const menuItems = [
-  { href: "/dashboard/admin", label: "الرئيسية", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/admin/students", label: "الطلاب", icon: Users },
-  { href: "/dashboard/admin/courses", label: "الكورسات", icon: BookOpen },
-  { href: "/dashboard/admin/exams", label: "الاختبارات", icon: ClipboardList, exact: true },
-  { href: "/dashboard/admin/exams/review", label: "تصحيح المقالي", icon: FileText, exact: true },
-  { href: "/dashboard/admin/assignments", label: "الواجبات", icon: ClipboardCheck },
-  { href: "/dashboard/admin/notifications", label: "الإشعارات", icon: Bell },
-  { href: "/dashboard/admin/codes", label: "الأكواد", icon: KeyRound },
-  { href: "/dashboard/admin/grade-images", label: "صور المراحل", icon: BookOpen },
+  { href: "/dashboard/admin", label: "الرئيسية", icon: LayoutDashboard, exact: true, roles: ["teacher", "assistant"] },
+  { href: "/dashboard/admin/students", label: "الطلاب", icon: Users, roles: ["teacher", "assistant"] },
+  { href: "/dashboard/admin/courses", label: "الكورسات", icon: BookOpen, roles: ["teacher", "assistant"] },
+  { href: "/dashboard/admin/exams", label: "الاختبارات", icon: ClipboardList, exact: true, roles: ["teacher", "assistant"] },
+  { href: "/dashboard/admin/exams/review", label: "تصحيح المقالي", icon: FileText, exact: true, roles: ["teacher", "assistant"] },
+  { href: "/dashboard/admin/assignments", label: "الواجبات", icon: ClipboardCheck, roles: ["teacher", "assistant"] },
+  { href: "/dashboard/admin/notifications", label: "الإشعارات", icon: Bell, roles: ["teacher", "assistant"] },
+  { href: "/dashboard/admin/codes", label: "الأكواد", icon: KeyRound, roles: ["teacher", "assistant"] },
+  { href: "/dashboard/admin/assistants", label: "المساعدون", icon: UserCog, roles: ["teacher"] },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -51,6 +51,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isActive = (item: typeof menuItems[0]) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href)
+
+  const visibleMenuItems = menuItems.filter(item =>
+    item.roles.includes(user?.role || "")
+  )
 
   return (
     <div className="min-h-screen bg-muted/30 flex">
@@ -88,7 +92,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => (
+          {visibleMenuItems.map((item) => (
             <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",

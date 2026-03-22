@@ -33,6 +33,7 @@ import {
   Download,
 } from "lucide-react";
 import { codesAPI, coursesAPI } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 interface Code {
   id: string;
@@ -78,6 +79,8 @@ const statusConfig: Record<
 };
 
 export default function CodesPage() {
+  const { user } = useAuth();
+  const isTeacher = user?.role === "teacher";
   const [codes, setCodes] = useState<Code[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -129,8 +132,8 @@ export default function CodesPage() {
     setFormError("");
     try {
       await codesAPI.generate({
-        code_type: form.code_type,
-        course_id: form.code_type === "course" ? form.course_id : null,
+        code_type: form.code_type as "course" | "bundle",
+        course_id: form.code_type === "course" ? form.course_id : undefined,
         quantity: Number(form.quantity),
         expires_days: Number(form.expires_days),
       });
@@ -264,13 +267,14 @@ export default function CodesPage() {
                 تصدير CSV ({filtered.length})
               </Button>
             )}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                  <Plus className="w-4 h-4 ml-2" />
-                  توليد أكواد
-                </Button>
-              </DialogTrigger>
+            {isTeacher && (
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                    <Plus className="w-4 h-4 ml-2" />
+                    توليد أكواد
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="max-w-md" dir="rtl">
                 <DialogHeader>
                   <DialogTitle>توليد أكواد جديدة</DialogTitle>
@@ -371,6 +375,7 @@ export default function CodesPage() {
                 </form>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </div>
       </div>
@@ -483,7 +488,7 @@ export default function CodesPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
-                      {code.status === "active" && (
+                      {isTeacher && code.status === "active" && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -494,7 +499,7 @@ export default function CodesPage() {
                           تعطيل
                         </Button>
                       )}
-                      {true && (
+                      {isTeacher && (
                         <Button
                           size="sm"
                           variant="ghost"

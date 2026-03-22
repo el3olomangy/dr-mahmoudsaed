@@ -57,3 +57,9 @@ async def get_current_teacher_or_assistant(current_user=Depends(get_current_user
     if current_user["role"] not in ["teacher", "assistant"]:
         raise HTTPException(status_code=403, detail="محتاج صلاحية مدرس أو مساعد")
     return current_user
+
+# ====== helper: المساعد يشوف بس — مش يعدل ======
+def require_teacher_for_write(current_user, action: str = "هذا الإجراء"):
+    """استخدمه جوا route بيقبل teacher_or_assistant لو العملية كتابة حساسة"""
+    if current_user["role"] != "teacher":
+        raise HTTPException(status_code=403, detail=f"{action} — محتاج صلاحية مدرس")

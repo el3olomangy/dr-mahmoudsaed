@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import random
 import string
 from ...core.database import get_db
-from ...core.dependencies import get_current_user, get_current_teacher
+from ...core.dependencies import get_current_user, get_current_teacher, get_current_teacher_or_assistant
 from ...schemas.code import CodeGenerate, CodeActivate, CodeResponse, CodeStatus, CodeType
 
 router = APIRouter(prefix="/codes", tags=["Codes"])
@@ -75,7 +75,7 @@ async def generate_codes(data: CodeGenerate, current_user=Depends(get_current_te
 
 
 @router.get("/", response_model=List[CodeResponse])
-async def get_codes(current_user=Depends(get_current_teacher), db=Depends(get_db)):
+async def get_codes(current_user=Depends(get_current_teacher_or_assistant), db=Depends(get_db)):
     codes = await db.codes.find().sort("created_at", -1).to_list(1000)
     return [code_helper(c) for c in codes]
 

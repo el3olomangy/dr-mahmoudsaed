@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -55,11 +55,13 @@ const emptyEssay = (): Question => ({
 
 export default function NewExamPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [title, setTitle] = useState("")
   const [courseId, setCourseId] = useState("")
   const [examScope, setExamScope] = useState<ExamScope>("course")
   const [lectureId, setLectureId] = useState("")
+  const [unitId, setUnitId] = useState("")
   const [duration, setDuration] = useState(30)
   const [passScore, setPassScore] = useState(50)
   const [showResult, setShowResult] = useState(true)
@@ -83,6 +85,14 @@ export default function NewExamPage() {
       .then((d: any) => setCourses(d))
       .catch(() => {})
       .finally(() => setLoadingCourses(false))
+  }, [])
+
+  // قرأ الـ params من الـ URL لو جاي من صفحة الكورس
+  useEffect(() => {
+    const cId = searchParams.get("course_id")
+    const uId = searchParams.get("unit_id")
+    if (cId) setCourseId(cId)
+    if (uId) { setUnitId(uId); setExamScope("unit" as ExamScope) }
   }, [])
 
   useEffect(() => {
@@ -156,7 +166,8 @@ export default function NewExamPage() {
       await examsAPI.create({
         title: title.trim(),
         course_id: courseId,
-        lecture_id: examScope === "lecture" ? lectureId : null,
+        lecture_id: examScope === "lecture" ? lectureId : undefined,
+        unit_id: unitId || undefined,
         duration_minutes: duration,
         pass_score: passScore,
         show_result_immediately: showResult,

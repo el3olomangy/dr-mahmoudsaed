@@ -31,25 +31,26 @@ export default function DashboardPage() {
   })
 
   useEffect(() => {
+    if (!user?.id) return
     const fetchData = async () => {
       try {
         const data = await coursesAPI.getAll() as Course[]
 
-        // فلتر الكورسات الموجودة فعلاً
-        const existingIds = new Set(data.map((c: Course) => c.id))
-        const validEnrolled = (user?.enrolled_courses || []).filter(id => existingIds.has(id))
-        if (validEnrolled.length !== (user?.enrolled_courses || []).length) {
-          updateUser({ enrolled_courses: validEnrolled })
-        }
-
         setCourses(data.slice(0, 3))
 
-        // جيب الإحصائيات من كل الكورسات المشترك فيها
+        // جيب الكورسات المشترك فيها من الـ API response مباشرة (is_enrolled)
+        const enrolledCourses = data.filter((c: Course) => c.is_enrolled)
+        const enrolledIds = enrolledCourses.map((c: Course) => c.id)
+
+        // حدّث الـ user بالكورسات الصح
+        updateUser({ enrolled_courses: enrolledIds })
+
+        // جيب الإحصائيات
         let totalWatched = 0
         let totalPassed = 0
         let totalTaken = 0
 
-        await Promise.all(validEnrolled.map(async (courseId: string) => {
+        await Promise.all(enrolledIds.map(async (courseId: string) => {
           try {
             const p: any = await progressAPI.getCourseProgress(courseId)
             totalWatched += p.watched || 0
@@ -59,7 +60,7 @@ export default function DashboardPage() {
         }))
 
         setStats({
-          enrolled: validEnrolled.length,
+          enrolled: enrolledIds.length,
           watched: totalWatched,
           exams_passed: totalPassed,
           exams_taken: totalTaken,
@@ -71,7 +72,7 @@ export default function DashboardPage() {
       }
     }
     fetchData()
-  }, [])
+  }, [user?.id])
 
   const statCards = [
     {
@@ -87,7 +88,7 @@ export default function DashboardPage() {
       color: "text-blue-500",
     },
     {
-      label: "اختبارات محلولة",
+      label: "الاختبارات (ناجح/أجريت)",
       value: isLoading ? "..." : `${stats.exams_passed}/${stats.exams_taken}`,
       icon: FileCheck,
       color: "text-green-500",
@@ -132,20 +133,20 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         {statCards.map((stat, index) => (
           <Card key={index}>
-            <CardContent className="p-4 lg:p-6 flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl bg-muted flex items-center justify-center ${stat.color}`}>
-                <stat.icon className="w-6 h-6" />
+            <CardContent className="p-3 lg:p-6 flex flex-col items-center text-center gap-2 lg:flex-row lg:text-right lg:gap-4">
+              <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-muted flex items-center justify-center shrink-0 ${stat.color}`}>
+                <stat.icon className="w-5 h-5 lg:w-6 lg:h-6" />
               </div>
-              <div>
+              <div className="min-w-0">
                 {isLoading ? (
-                  <Skeleton className="h-8 w-10 mb-1" />
+                  <Skeleton className="h-6 w-8 mb-1 mx-auto lg:mx-0" />
                 ) : (
-                  <p className="text-2xl lg:text-3xl font-extrabold text-foreground">{stat.value}</p>
+                  <p className="text-lg lg:text-3xl font-extrabold text-foreground leading-tight">{stat.value}</p>
                 )}
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
+                <p className="text-xs lg:text-sm text-muted-foreground leading-tight">{stat.label}</p>
               </div>
             </CardContent>
           </Card>

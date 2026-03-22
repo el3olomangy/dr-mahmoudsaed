@@ -4,12 +4,35 @@ import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Sun, Moon } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
   const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  // لازم ننتظر الـ mount عشان نعرف الثيم الحقيقي
+  useEffect(() => { setMounted(true) }, [])
+
+  const isDark = mounted && theme === "dark"
+
+  const ThemeButton = ({ className = "" }: { className?: string }) => (
+    <button
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className={`p-2 rounded-xl hover:bg-muted transition-colors ${className}`}
+      title={isDark ? "الوضع النهاري" : "الوضع الليلي"}
+      suppressHydrationWarning
+    >
+      {/* لما مش mounted نعرض placeholder بنفس الحجم */}
+      {!mounted
+        ? <div className="w-5 h-5" />
+        : isDark
+          ? <Sun className="w-5 h-5 text-amber-500" />
+          : <Moon className="w-5 h-5 text-muted-foreground" />
+      }
+    </button>
+  )
 
   return (
     <header className="fixed top-0 right-0 left-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -29,17 +52,7 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-2">
-            {/* زرار الثيم */}
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 rounded-xl hover:bg-muted transition-colors"
-              title={theme === "dark" ? "الوضع النهاري" : "الوضع الليلي"}
-            >
-              {theme === "dark"
-                ? <Sun className="w-5 h-5 text-amber-500" />
-                : <Moon className="w-5 h-5 text-muted-foreground" />
-              }
-            </button>
+            <ThemeButton />
             <Button variant="ghost" asChild>
               <Link href="/login">تسجيل الدخول</Link>
             </Button>
@@ -50,15 +63,7 @@ export function Navbar() {
 
           {/* Mobile: ثيم + هامبرجر */}
           <div className="md:hidden flex items-center gap-1">
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 rounded-xl hover:bg-muted transition-colors"
-            >
-              {theme === "dark"
-                ? <Sun className="w-5 h-5 text-amber-500" />
-                : <Moon className="w-5 h-5 text-muted-foreground" />
-              }
-            </button>
+            <ThemeButton />
             <button
               className="p-2"
               onClick={() => setIsOpen(!isOpen)}
