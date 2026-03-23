@@ -148,7 +148,7 @@ export default function NewHomeworkPage() {
         show_result_immediately: true,
         scheduled_at: null,
         is_homework: true,
-        deadline,
+        deadline: deadline ?? undefined,
         questions: questions.map(q => ({
           text: q.text.trim(),
           question_type: "mcq",
