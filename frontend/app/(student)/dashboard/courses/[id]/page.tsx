@@ -25,6 +25,9 @@ interface Course {
   price?: number; thumbnail?: string; units: Unit[]; is_enrolled: boolean
 }
 interface ExamInfo { id: string; title: string; duration_minutes: number; lecture_id: string | null; is_homework: boolean; deadline?: string }const gradeLabels: Record<string, string> = {
+  first_preparatory: "الصف الأول الإعدادي",
+  second_preparatory: "الصف الثاني الإعدادي",
+  third_preparatory: "الصف الثالث الإعدادي",
   first_secondary: "الصف الأول الثانوي",
   second_secondary: "الصف الثاني الثانوي",
   third_secondary: "الصف الثالث الثانوي",

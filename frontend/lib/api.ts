@@ -269,6 +269,36 @@ export const examsAPI = {
   deleteExam: (examId: string) =>
     request(`/exams/${examId}`, { method: "DELETE" }),
 
+  updateExam: (examId: string, data: {
+    title?: string
+    duration_minutes?: number
+    pass_score?: number
+    deadline?: string | null
+    show_result_immediately?: boolean
+  }) =>
+    request(`/exams/${examId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  updateExamFull: (examId: string, data: {
+    title?: string
+    duration_minutes?: number
+    pass_score?: number
+    show_result_immediately?: boolean
+    deadline?: string | null
+    questions?: {
+      text: string
+      question_type: "mcq" | "essay"
+      points: number
+      choices: { text: string; is_correct: boolean }[]
+    }[]
+  }) =>
+    request(`/exams/${examId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
   submit: (data: {
     exam_id: string
     answers: {
@@ -284,15 +314,15 @@ export const examsAPI = {
 
   getMyResult: (examId: string) => request(`/exams/my-result/${examId}`),
 
-  getResults: (examId: string) => request(`/exams/${examId}/results`),
+  getResults: (examId: string) => request(`/exams/results/${examId}`),
 
   submitReview: (
     resultId: string,
     data: { question_id: string; points: number }[]
   ) =>
-    request(`/exams/results/${resultId}/review`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
+    request(`/exams/review`, {
+      method: "POST",
+      body: JSON.stringify({ result_id: resultId, grades: data }),
     }),
 }
 
@@ -453,7 +483,7 @@ export const assignmentsAPI = {
       body: JSON.stringify(data),
     }),
 
-  grade: (submissionId: string, data: { grade: number; teacher_note?: string }) =>
+  grade: (submissionId: string, data: { grade: number | null; teacher_note?: string | null }) =>
     request(`/assignments/submissions/${submissionId}/grade`, {
       method: "PATCH",
       body: JSON.stringify(data),

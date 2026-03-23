@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from bson import ObjectId
 from ...core.database import get_db
 from ...core.dependencies import get_current_user, get_current_teacher_or_assistant
 
+from slowapi import Limiter  # type: ignore
+from slowapi.util import get_remote_address  # type: ignore
 router = APIRouter(prefix="/progress", tags=["Progress"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 async def log_activity(db, student_id: str, activity_type: str, details: dict):
@@ -215,7 +218,9 @@ async def get_student_course_progress(
 
 
 @router.get("/parent/{parent_phone}")
+@limiter.limit("10/minute")
 async def get_student_progress_for_parent(
+    request: Request,
     parent_phone: str,
     db=Depends(get_db)
 ):
@@ -363,7 +368,9 @@ async def get_student_progress_for_parent(
 # ====== Activity Log لولي الأمر ======
 
 @router.get("/parent/{parent_phone}/activity")
+@limiter.limit("10/minute")
 async def get_parent_activity(
+    request: Request,
     parent_phone: str,
     db=Depends(get_db)
 ):

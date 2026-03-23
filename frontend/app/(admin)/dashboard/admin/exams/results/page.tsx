@@ -1,25 +1,43 @@
 "use client"
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, Suspense, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import {
   ArrowRight, CheckCircle, XCircle, Users,
-  TrendingUp, Clock, BarChart2, Search,
+  TrendingUp, Clock, BarChart2, Search, ChevronDown, ChevronUp,
+  Phone, RefreshCw,
 } from "lucide-react"
 import { examsAPI } from "@/lib/api"
 import { Input } from "@/components/ui/input"
+import { useAutoRefresh } from "@/hooks/useAutoRefresh"
+
+interface Answer {
+  question_id: string
+  question_text: string
+  question_type: "mcq" | "essay"
+  max_points: number
+  correct_answer: string | null
+  selected_text: string | null
+  essay_answer: string | null
+  is_correct: boolean
+  earned_points: number
+  teacher_comment: string
+}
 
 interface StudentResult {
   student_id: string
   student_name: string
+  student_phone: string
   score: number
   passed: boolean
   submitted_at: string
   earned_points: number
   total_points: number
+  essay_fully_reviewed: boolean
+  answers: Answer[]
 }
 
 interface ExamInfo {
@@ -29,6 +47,88 @@ interface ExamInfo {
   total_results: number
   pass_rate: number
   avg_score: number
+}
+
+function AnswersPanel({ answers }: { answers: Answer[] }) {
+  return (
+    <div className="px-4 pb-4 space-y-3">
+      {answers.map((ans, i) => {
+        const isMcq = ans.question_type === "mcq"
+        const isEssay = ans.question_type === "essay"
+        return (
+          <div
+            key={ans.question_id + i}
+            className={`rounded-xl border p-3 text-sm ${
+              isMcq
+                ? ans.is_correct
+                  ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20"
+                  : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"
+                : "border-border bg-muted/30"
+            }`}
+          >
+            {/* نص السؤال */}
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <p className="font-bold text-foreground">
+                {i + 1}. {ans.question_text || "سؤال"}
+              </p>
+              <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${
+                isMcq
+                  ? ans.is_correct
+                    ? "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200"
+                    : "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200"
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                {ans.earned_points} / {ans.max_points} درجة
+              </span>
+            </div>
+
+            {/* MCQ */}
+            {isMcq && (
+              <div className="space-y-1 text-xs">
+                {ans.selected_text && (
+                  <div className="flex items-center gap-1.5">
+                    {ans.is_correct
+                      ? <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                      : <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                    }
+                    <span className="text-muted-foreground">إجابة الطالب:</span>
+                    <span className={`font-medium ${ans.is_correct ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
+                      {ans.selected_text}
+                    </span>
+                  </div>
+                )}
+                {!ans.is_correct && ans.correct_answer && (
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                    <span className="text-muted-foreground">الإجابة الصح:</span>
+                    <span className="font-medium text-green-700 dark:text-green-400">{ans.correct_answer}</span>
+                  </div>
+                )}
+                {!ans.selected_text && (
+                  <p className="text-muted-foreground italic">لم يجب</p>
+                )}
+              </div>
+            )}
+
+            {/* Essay */}
+            {isEssay && (
+              <div className="space-y-1 text-xs">
+                <p className="text-muted-foreground">إجابة الطالب:</p>
+                <p className="text-foreground bg-background rounded p-2 border border-border">
+                  {ans.essay_answer || <span className="italic text-muted-foreground">لم يجب</span>}
+                </p>
+                {ans.teacher_comment && (
+                  <p className="text-muted-foreground italic border-r-2 border-primary/40 pr-2 mt-1">
+                    تعليق المدرس: {ans.teacher_comment}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function ResultsInner() {
@@ -41,42 +141,54 @@ function ResultsInner() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const load = useCallback(async () => {
+    if (!examId) { setError("مفيش ID للاختبار"); setIsLoading(false); return }
+    try {
+      const [examData, resultsData] = await Promise.all([
+        examsAPI.getExamForAdmin(examId) as Promise<any>,
+        examsAPI.getResults(examId) as Promise<any[]>,
+      ])
+
+      setExamInfo({
+        id: examId,
+        title: examData.title,
+        pass_score: examData.pass_score,
+        total_results: resultsData.length,
+        pass_rate: resultsData.length > 0
+          ? Math.round(resultsData.filter(r => r.passed).length / resultsData.length * 100)
+          : 0,
+        avg_score: resultsData.length > 0
+          ? Math.round(resultsData.reduce((s, r) => s + r.score, 0) / resultsData.length)
+          : 0,
+      })
+      setResults(resultsData)
+    } catch (err: any) {
+      setError(err.message || "حصل خطأ في تحميل النتائج")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [examId])
 
   useEffect(() => {
-    if (!examId) { setError("مفيش ID للاختبار"); setIsLoading(false); return }
-
-    const load = async () => {
-      try {
-        const [examData, resultsData] = await Promise.all([
-          examsAPI.getExamForAdmin(examId) as Promise<any>,
-          examsAPI.getResults(examId) as Promise<any[]>,
-        ])
-
-        setExamInfo({
-          id: examId,
-          title: examData.title,
-          pass_score: examData.pass_score,
-          total_results: resultsData.length,
-          pass_rate: resultsData.length > 0
-            ? Math.round(resultsData.filter(r => r.passed).length / resultsData.length * 100)
-            : 0,
-          avg_score: resultsData.length > 0
-            ? Math.round(resultsData.reduce((s, r) => s + r.score, 0) / resultsData.length)
-            : 0,
-        })
-        setResults(resultsData)
-      } catch (err: any) {
-        setError(err.message || "حصل خطأ في تحميل النتائج")
-      } finally {
-        setIsLoading(false)
-      }
-    }
     load()
-  }, [examId])
+  }, [load])
+
+  // auto-refresh كل 30 ثانية
+  useAutoRefresh(load, 30000, !!examId)
 
   const filtered = results.filter(r =>
     r.student_name?.toLowerCase().includes(search.toLowerCase()) ||
-    r.student_id?.includes(search)
+    r.student_phone?.includes(search)
   )
 
   const formatDate = (dateStr: string) => {
@@ -184,10 +296,10 @@ function ResultsInner() {
               النتائج التفصيلية
             </CardTitle>
             {results.length > 0 && (
-              <div className="relative w-48">
+              <div className="relative w-52">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="ابحث باسم الطالب..."
+                  placeholder="ابحث بالاسم أو الهاتف..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="pr-9 h-8 text-sm"
@@ -208,35 +320,64 @@ function ResultsInner() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {filtered.map((r, idx) => (
-                <div key={r.student_id + idx} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${r.passed ? "bg-green-500" : "bg-destructive"}`}>
-                      {r.passed ? "✓" : "✗"}
+              {filtered.map((r, idx) => {
+                const key = r.student_id + idx
+                const isOpen = expanded.has(key)
+                return (
+                  <div key={key}>
+                    {/* صف الطالب */}
+                    <div
+                      className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => toggleExpand(key)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${r.passed ? "bg-green-500" : "bg-destructive"}`}>
+                          {r.passed ? "✓" : "✗"}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-foreground">{r.student_name || "طالب"}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Phone className="w-3 h-3" />
+                              {r.student_phone || "—"}
+                            </p>
+                            <span className="text-muted-foreground text-xs">·</span>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatDate(r.submitted_at)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-center">
+                          <p className={`text-lg font-extrabold ${r.passed ? "text-green-600" : "text-destructive"}`}>
+                            {Math.round(r.score)}%
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {r.earned_points} / {r.total_points}
+                          </p>
+                        </div>
+                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${r.passed ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-destructive/10 text-destructive"}`}>
+                          {r.passed ? "ناجح" : "راسب"}
+                        </span>
+                        {r.answers?.length > 0 && (
+                          isOpen
+                            ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                            : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-sm text-foreground">{r.student_name || "طالب"}</p>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatDate(r.submitted_at)}
-                      </p>
-                    </div>
+
+                    {/* إجابات الطالب */}
+                    {isOpen && r.answers?.length > 0 && (
+                      <div className="bg-muted/20 border-t border-border">
+                        <AnswersPanel answers={r.answers} />
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-center">
-                      <p className={`text-lg font-extrabold ${r.passed ? "text-green-600" : "text-destructive"}`}>
-                        {Math.round(r.score)}%
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {r.earned_points} / {r.total_points}
-                      </p>
-                    </div>
-                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${r.passed ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-destructive/10 text-destructive"}`}>
-                      {r.passed ? "ناجح" : "راسب"}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

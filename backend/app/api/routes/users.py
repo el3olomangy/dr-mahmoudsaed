@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import List, Optional
 from bson import ObjectId
@@ -6,9 +6,12 @@ from bson.errors import InvalidId
 from datetime import datetime, timezone
 from ...core.database import get_db
 from ...core.dependencies import get_current_user, get_current_teacher, get_current_teacher_or_assistant
-from ...core.security import get_password_hash
+from ...core.security import get_password_hash, verify_password
+from slowapi import Limiter  # type: ignore
+from slowapi.util import get_remote_address  # type: ignore
 
 router = APIRouter(prefix="/users", tags=["Users"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 def validate_object_id(id_str: str) -> ObjectId:
@@ -19,6 +22,7 @@ def validate_object_id(id_str: str) -> ObjectId:
 
 
 def user_helper(user) -> dict:
+    """بيانات الطالب — بدون أي بيانات حساسة"""
     return {
         "id": str(user["_id"]),
         "first_name": user["first_name"],
@@ -30,6 +34,7 @@ def user_helper(user) -> dict:
         "role": user["role"],
         "is_active": user.get("is_active", True),
         "enrolled_courses": user.get("enrolled_courses", []),
+        # parent_phone و device_id و password مش بيتبعتوا أبداً
     }
 
 
@@ -72,7 +77,8 @@ async def update_my_profile(data: ProfileUpdate, current_user=Depends(get_curren
 # ====== ولي الأمر ======
 
 @router.get("/parent/{parent_phone}")
-async def get_student_by_parent(parent_phone: str, db=Depends(get_db)):
+@limiter.limit("10/minute")
+async def get_student_by_parent(request: Request, parent_phone: str, db=Depends(get_db)):
     student = await db.users.find_one({"parent_phone": parent_phone, "role": "student"})
     if not student:
         raise HTTPException(status_code=404, detail="مفيش طالب مرتبط بالرقم ده")

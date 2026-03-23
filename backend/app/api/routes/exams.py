@@ -70,17 +70,24 @@ async def submit_exam(data: ExamSubmit, current_user=Depends(get_current_user), 
         if not q:
             continue
         is_correct = False
+        selected_text = None
+        earned = 0
         if q["question_type"] == "mcq" and q.get("choices"):
             for i, choice in enumerate(q["choices"]):
-                if str(i) == answer.selected_choice and choice["is_correct"]:
-                    is_correct = True
-                    earned_points += q["points"]
+                if str(i) == answer.selected_choice:
+                    selected_text = choice.get("text")
+                    if choice.get("is_correct"):
+                        is_correct = True
+                        earned = q["points"]
+                        earned_points += earned
                     break
         answers_log.append({
             "question_id": answer.question_id,
             "selected_choice": answer.selected_choice,
+            "selected_text": selected_text,
             "essay_answer": answer.essay_answer,
             "is_correct": is_correct,
+            "earned_points": earned,
         })
 
     score = (earned_points / total_points * 100) if total_points > 0 else 0
@@ -118,7 +125,6 @@ async def get_course_exams(course_id: str, current_user=Depends(get_current_user
         "title": e["title"],
         "duration_minutes": e["duration_minutes"],
         "lecture_id": e.get("lecture_id"),
-        "unit_id": e.get("unit_id"),
         "pass_score": e.get("pass_score", 50),
         "scheduled_at": e.get("scheduled_at"),
         "is_homework": e.get("is_homework", False),
@@ -129,12 +135,73 @@ async def get_course_exams(course_id: str, current_user=Depends(get_current_user
 @router.get("/results/{exam_id}")
 async def get_exam_results(exam_id: str, current_user=Depends(get_current_teacher), db=Depends(get_db)):
     results = await db.exam_results.find({"exam_id": exam_id}).to_list(500)
-    return [{
-        "student_id": r["student_id"],
-        "score": r["score"],
-        "passed": r["passed"],
-        "submitted_at": r["submitted_at"],
-    } for r in results]
+
+    # جيب الاختبار عشان نعرف الأسئلة والإجابات الصح
+    exam = await db.exams.find_one({"_id": validate_object_id(exam_id)}) if ObjectId.is_valid(exam_id) else None
+    questions_map = {}
+    if exam:
+        for q in exam.get("questions", []):
+            qid = str(q["_id"])
+            choices = q.get("choices", [])
+            correct_text = next((c["text"] for c in choices if c.get("is_correct")), None)
+            questions_map[qid] = {
+                "text": q.get("text", ""),
+                "type": q.get("question_type", "mcq"),
+                "points": q.get("points", 1),
+                "correct_answer": correct_text,
+                "choices": choices,
+            }
+
+    output = []
+    for r in results:
+        student = await db.users.find_one({"_id": ObjectId(r["student_id"])}) if ObjectId.is_valid(r["student_id"]) else None
+        student_name = f"{student['first_name']} {student['last_name']}" if student else "—"
+        student_phone = student.get("phone", "—") if student else "—"
+
+        answers_detail = []
+        for ans in r.get("answers", []):
+            qid = ans.get("question_id", "")
+            q_info = questions_map.get(qid, {})
+            choices = q_info.get("choices", [])
+
+            selected_text = ans.get("selected_text")
+            if not selected_text:
+                sel = ans.get("selected_choice")
+                if sel is not None:
+                    try:
+                        idx = int(sel)
+                        if 0 <= idx < len(choices):
+                            selected_text = choices[idx].get("text")
+                    except (ValueError, TypeError):
+                        selected_text = sel
+
+            answers_detail.append({
+                "question_id": qid,
+                "question_text": q_info.get("text", ""),
+                "question_type": q_info.get("type", "mcq"),
+                "max_points": q_info.get("points", 1),
+                "correct_answer": q_info.get("correct_answer"),
+                "selected_text": selected_text,
+                "essay_answer": ans.get("essay_answer"),
+                "is_correct": ans.get("is_correct", False),
+                "earned_points": ans.get("earned_points", 0),
+                "teacher_comment": ans.get("teacher_comment", ""),
+            })
+
+        output.append({
+            "student_id": r["student_id"],
+            "student_name": student_name,
+            "student_phone": student_phone,
+            "score": r["score"],
+            "passed": r["passed"],
+            "earned_points": r.get("earned_points", 0),
+            "total_points": r.get("total_points", 0),
+            "submitted_at": r["submitted_at"],
+            "essay_fully_reviewed": r.get("essay_fully_reviewed", False),
+            "answers": answers_detail,
+        })
+
+    return output
 
 
 # ====== Essay Review ======
@@ -440,8 +507,10 @@ async def full_update_exam(exam_id: str, data: ExamFullUpdate, current_user=Depe
 
     deleted_results = 0
     if questions_changed:
-        result = await db.exam_results.delete_many({"exam_id": exam_id})
-        deleted_results = result.deleted_count
+        # لو الاختبار واجب — متمسحش نتائج الطلاب
+        if not exam.get("is_homework", False):
+            result = await db.exam_results.delete_many({"exam_id": exam_id})
+            deleted_results = result.deleted_count
 
     updated = await db.exams.find_one({"_id": oid})
     response = {

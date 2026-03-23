@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { statsAPI } from "@/lib/api"
+import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 
 interface Overview {
   students: { total: number; active: number; inactive: number; new_this_week: number }
@@ -35,6 +36,9 @@ interface RecentStudent {
 }
 
 const gradeLabel: Record<string, string> = {
+  first_preparatory: "أول إعدادي",
+  second_preparatory: "ثاني إعدادي",
+  third_preparatory: "ثالث إعدادي",
   first_secondary: "أول ثانوي",
   second_secondary: "ثاني ثانوي",
   third_secondary: "ثالث ثانوي",

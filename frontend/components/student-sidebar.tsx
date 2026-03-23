@@ -5,19 +5,14 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
+import { useEffect, useState, useCallback } from "react"
 import {
-  Home,
-  BookOpen,
-  User,
-  LogOut,
-  KeyRound,
-  Bell,
-  ChevronLeft,
-  Sun,
-  Moon,
+  Home, BookOpen, User, LogOut, KeyRound, Bell, ChevronLeft, Sun, Moon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/context/AuthContext"
+import { notificationsAPI } from "@/lib/api"
+import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 
 const menuItems = [
   { href: "/dashboard", label: "الصفحة الرئيسية", icon: Home },
@@ -28,6 +23,9 @@ const menuItems = [
 ]
 
 const gradeLabels: Record<string, string> = {
+  first_preparatory: "الصف الأول الإعدادي",
+  second_preparatory: "الصف الثاني الإعدادي",
+  third_preparatory: "الصف الثالث الإعدادي",
   first_secondary: "الصف الأول الثانوي",
   second_secondary: "الصف الثاني الثانوي",
   third_secondary: "الصف الثالث الثانوي",
@@ -42,6 +40,17 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  const fetchUnread = useCallback(async () => {
+    try {
+      const notifs = await notificationsAPI.getAll() as any[]
+      setUnreadCount(notifs.filter((n: any) => !n.is_read).length)
+    } catch {}
+  }, [])
+
+  useEffect(() => { if (user) fetchUnread() }, [user])
+  useAutoRefresh(fetchUnread, 30000, !!user)
 
   const handleLogout = () => {
     onClose()
@@ -123,6 +132,11 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
                 >
                   <item.icon className="w-5 h-5" />
                   <span className="font-medium">{item.label}</span>
+                  {item.href === "/dashboard/notifications" && unreadCount > 0 && (
+                    <span className="mr-auto bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
                 </Link>
               )
             })}

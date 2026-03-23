@@ -37,6 +37,9 @@ interface Student {
 }
 
 const grades = [
+  { value: "first_preparatory", label: "أولى إعدادي" },
+  { value: "second_preparatory", label: "ثانية إعدادي" },
+  { value: "third_preparatory", label: "ثالثة إعدادي" },
   { value: "first_secondary", label: "أولى ثانوي" },
   { value: "second_secondary", label: "ثانية ثانوي" },
   { value: "third_secondary", label: "ثالثة ثانوي" },

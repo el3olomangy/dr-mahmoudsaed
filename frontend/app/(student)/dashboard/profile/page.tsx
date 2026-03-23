@@ -13,6 +13,9 @@ import { useAuth } from "@/context/AuthContext"
 import { usersAPI, progressAPI, authAPI, coursesAPI } from "@/lib/api"
 
 const gradeLabels: Record<string, string> = {
+  first_preparatory: "الصف الأول الإعدادي",
+  second_preparatory: "الصف الثاني الإعدادي",
+  third_preparatory: "الصف الثالث الإعدادي",
   first_secondary: "الصف الأول الثانوي",
   second_secondary: "الصف الثاني الثانوي",
   third_secondary: "الصف الثالث الثانوي",

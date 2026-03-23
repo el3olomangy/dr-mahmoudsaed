@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,8 +35,6 @@ import {
   AlertCircle,
   Users,
   ChevronLeft,
-  Bell,
-  RefreshCw,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -43,6 +42,9 @@ const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 
 const gradeLabels: Record<string, string> = {
+  first_preparatory: "الصف الأول الإعدادي",
+  second_preparatory: "الصف الثاني الإعدادي",
+  third_preparatory: "الصف الثالث الإعدادي",
   first_secondary: "الصف الأول الثانوي",
   second_secondary: "الصف الثاني الثانوي",
   third_secondary: "الصف الثالث الثانوي",
@@ -517,122 +519,14 @@ function CourseCard({ course }: { course: CourseProgress }) {
 }
 
 // ====== Student Detail View ======
-// ====== Activity Feed ======
-interface Activity {
-  id: string
-  student_name: string
-  activity_type: string
-  details: { message?: string; score?: number; passed?: boolean; exam_title?: string; assignment_title?: string; lecture_title?: string }
-  created_at: string
-}
-
-function ActivityIcon({ type }: { type: string }) {
-  if (type === "lecture_watched") return <PlayCircle className="w-4 h-4 text-blue-500" />
-  if (type === "exam_submitted") return <FileCheck className="w-4 h-4 text-primary" />
-  if (type === "homework_submitted") return <ClipboardList className="w-4 h-4 text-amber-500" />
-  if (type === "assignment_submitted") return <ClipboardList className="w-4 h-4 text-amber-500" />
-  return <Bell className="w-4 h-4 text-muted-foreground" />
-}
-
-function ActivityFeed({ phone }: { phone: string }) {
-  const [activities, setActivities] = useState<Activity[]>([])
-  const [loading, setLoading] = useState(true)
-  const [lastRefresh, setLastRefresh] = useState(new Date())
-
-  const fetchActivities = async () => {
-    try {
-      const res = await fetch(`${BASE_URL}/progress/parent/${phone}/activity`)
-      if (!res.ok) return
-      const data = await res.json()
-      setActivities(data.activities || [])
-      setLastRefresh(new Date())
-    } catch {} finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchActivities()
-    // auto-refresh كل 30 ثانية
-    const interval = setInterval(fetchActivities, 30000)
-    return () => clearInterval(interval)
-  }, [phone])
-
-  function timeAgo(iso: string) {
-    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-    if (diff < 60) return "الآن"
-    if (diff < 3600) return `منذ ${Math.floor(diff / 60)} دقيقة`
-    if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} ساعة`
-    return `منذ ${Math.floor(diff / 86400)} يوم`
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-primary" />
-            <CardTitle className="text-base">آخر النشاطات</CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {lastRefresh.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-            <button onClick={fetchActivities} className="p-1 rounded hover:bg-muted transition-colors">
-              <RefreshCw className={`w-3.5 h-3.5 text-muted-foreground ${loading ? "animate-spin" : ""}`} />
-            </button>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">يتحدث تلقائياً كل 30 ثانية</p>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {loading ? (
-          <div className="space-y-2">
-            {[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}
-          </div>
-        ) : activities.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">مفيش نشاطات لسه</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {activities.map(act => (
-              <div key={act.id} className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border border-border">
-                <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center shrink-0 border border-border">
-                  <ActivityIcon type={act.activity_type} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-foreground">{act.student_name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {act.details.message || act.activity_type}
-                  </p>
-                  {act.details.score !== undefined && (
-                    <span className={`text-xs font-bold mt-1 inline-block px-2 py-0.5 rounded-full ${act.details.passed ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"}`}>
-                      {Math.round(act.details.score)}% — {act.details.passed ? "ناجح" : "لم ينجح"}
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground shrink-0">{timeAgo(act.created_at)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 function StudentDetail({
   student,
   onBack,
   multipleStudents,
-  phone,
 }: {
   student: StudentData;
   onBack: () => void;
   multipleStudents: boolean;
-  phone: string;
 }) {
   const totalWatched = student.courses_progress.reduce(
     (s, c) => s + c.watched,
@@ -720,9 +614,6 @@ function StudentDetail({
           </CardContent>
         </Card>
       </div>
-
-      {/* Activity Feed */}
-      <ActivityFeed phone={phone} />
 
       {/* Courses */}
       <div className="space-y-4">
@@ -897,7 +788,6 @@ export default function ParentTrackingPage() {
             student={selectedStudent}
             onBack={handleBack}
             multipleStudents={students.length > 1}
-            phone={phone}
           />
         )}
       </main>
