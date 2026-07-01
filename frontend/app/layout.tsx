@@ -1,15 +1,8 @@
 import type { Metadata, Viewport } from 'next'
-import { Almarai } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/context/AuthContext'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
-
-const almarai = Almarai({ 
-  subsets: ["arabic"],
-  weight: ["300", "400", "700", "800"],
-  variable: "--font-almarai"
-});
 
 export const metadata: Metadata = {
   title: 'منصة العلومنجي | د. محمود سعيد',
@@ -36,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
-      <body className={`${almarai.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <AuthProvider>
             {children}
