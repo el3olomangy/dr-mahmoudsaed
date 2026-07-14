@@ -1,4 +1,4 @@
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient # pyright: ignore[reportMissingImports]
 from .config import settings
 
 client: AsyncIOMotorClient = None

@@ -1,8 +1,8 @@
 "use client"
 
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
+import { useEffect, useState } from "react"
+import { gradeImagesAPI } from "@/lib/api"
+import { getImageUrl } from "@/lib/utils/image"
 
 // ===== أيقونات SVG علمية مخصصة لكل مرحلة =====
 
@@ -142,6 +142,7 @@ const gradesMeta = [
     description: "كورسات وشروحات متكاملة لمنهج أولى إعدادي",
     color: "from-blue-500 to-blue-600",
     Icon: PrepIcon1,
+    image: "", // ضع هنا رابط أو مسار الصورة، مثال: "/grades/first_preparatory.jpg"
   },
   {
     id: "second_preparatory",
@@ -149,6 +150,7 @@ const gradesMeta = [
     description: "كورسات وشروحات متكاملة لمنهج تانية إعدادي",
     color: "from-cyan-500 to-cyan-600",
     Icon: PrepIcon2,
+    image: "",
   },
   {
     id: "third_preparatory",
@@ -156,6 +158,7 @@ const gradesMeta = [
     description: "كورسات وشروحات متكاملة لمنهج تالتة إعدادي",
     color: "from-teal-500 to-teal-600",
     Icon: PrepIcon3,
+    image: "",
   },
   {
     id: "first_secondary",
@@ -163,6 +166,7 @@ const gradesMeta = [
     description: "كورسات وشروحات متكاملة لمنهج أولى ثانوي",
     color: "from-[#fe2c55] to-[#d41f43]",
     Icon: SecIcon1,
+    image: "",
   },
   {
     id: "second_secondary",
@@ -170,6 +174,7 @@ const gradesMeta = [
     description: "كورسات وشروحات متكاملة لمنهج تانية ثانوي",
     color: "from-[#19c7ff] to-[#0da8dd]",
     Icon: SecIcon2,
+    image: "",
   },
   {
     id: "third_secondary",
@@ -177,10 +182,25 @@ const gradesMeta = [
     description: "كورسات وشروحات متكاملة لمنهج تالتة ثانوي",
     color: "from-violet-500 to-violet-700",
     Icon: SecIcon3,
+    image: "",
   },
 ]
 
 export function GradesSection() {
+  const [gradeImages, setGradeImages] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    gradeImagesAPI
+      .getAll()
+      .then(setGradeImages)
+      .catch(() => {})
+  }, [])
+
+  const grades = gradesMeta.map((grade) => ({
+    ...grade,
+    image: gradeImages[grade.id] || grade.image,
+  }))
+
   return (
     <section className="py-20">
       <div className="container mx-auto px-4">
@@ -202,7 +222,7 @@ export function GradesSection() {
             <span className="flex-1 h-px bg-border" />
           </div>
           <div className="grid md:grid-cols-3 gap-6">
-            {gradesMeta.slice(0, 3).map(grade => (
+            {grades.slice(0, 3).map(grade => (
               <GradeCard key={grade.id} grade={grade} />
             ))}
           </div>
@@ -216,7 +236,7 @@ export function GradesSection() {
             <span className="flex-1 h-px bg-border" />
           </div>
           <div className="grid md:grid-cols-3 gap-6">
-            {gradesMeta.slice(3).map(grade => (
+            {grades.slice(3).map(grade => (
               <GradeCard key={grade.id} grade={grade} />
             ))}
           </div>
@@ -228,36 +248,45 @@ export function GradesSection() {
 
 function GradeCard({ grade }: { grade: typeof gradesMeta[0] }) {
   const { Icon } = grade
+  const resolvedImage = getImageUrl(grade.image)
+  const hasImage = Boolean(resolvedImage)
+
   return (
     <div className="group relative bg-card rounded-2xl overflow-hidden border border-border hover:border-primary/30 transition-all hover:shadow-lg">
-      {/* الجزء العلوي — خلفية لون + أيقونة */}
-      <div className={`h-40 bg-linear-to-l ${grade.color} flex items-center justify-center relative overflow-hidden`}>
-        {/* باترن نقاط خفي في الخلفية */}
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
-            backgroundSize: "20px 20px",
-          }}
-        />
-        {/* حلقة ضوئية خلف الأيقونة */}
-        <div className="absolute w-32 h-32 rounded-full bg-white/10 blur-xl" />
-        {/* الأيقونة */}
-        <div className="relative z-10 drop-shadow-lg group-hover:scale-110 transition-transform duration-300">
-          <Icon />
+      {/* الجزء العلوي — صورة مخصصة أو خلفية لون + أيقونة */}
+      {hasImage ? (
+        <div className="h-40 relative overflow-hidden">
+          <img
+            src={resolvedImage!}
+            alt={grade.title}
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+          />
+          {/* تعتيم خفيف لضمان وضوح أي عناصر فوق الصورة */}
+          <div className="absolute inset-0 bg-black/20" />
         </div>
-      </div>
+      ) : (
+        <div className={`h-40 bg-linear-to-l ${grade.color} flex items-center justify-center relative overflow-hidden`}>
+          {/* باترن نقاط خفي في الخلفية */}
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
+              backgroundSize: "20px 20px",
+            }}
+          />
+          {/* حلقة ضوئية خلف الأيقونة */}
+          <div className="absolute w-32 h-32 rounded-full bg-white/10 blur-xl" />
+          {/* الأيقونة */}
+          <div className="relative z-10 drop-shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <Icon />
+          </div>
+        </div>
+      )}
 
       {/* محتوى الكارد */}
       <div className="p-6">
         <h3 className="text-xl font-bold mb-2 text-card-foreground">{grade.title}</h3>
         <p className="text-muted-foreground mb-4">{grade.description}</p>
-        <Button variant="ghost" asChild className="group/btn hover:text-primary p-0 h-auto">
-          <Link href={`/courses?grade=${grade.id}`} className="flex items-center gap-2">
-            <span>استعرض الكورسات</span>
-            <ArrowLeft className="w-4 h-4 group-hover/btn:-translate-x-1 transition-transform" />
-          </Link>
-        </Button>
       </div>
     </div>
   )

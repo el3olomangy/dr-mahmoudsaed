@@ -245,14 +245,14 @@ export default function CodesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-foreground">الأكواد</h1>
           <p className="text-muted-foreground mt-1">
             {isLoading ? "..." : `${codes.length} كود`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={fetchCodes} disabled={isLoading}>
             <RefreshCw
               className={`w-4 h-4 ml-2 ${isLoading ? "animate-spin" : ""}`}
@@ -260,7 +260,7 @@ export default function CodesPage() {
             تحديث
           </Button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {filtered.length > 0 && (
               <Button variant="outline" onClick={() => exportCSV(filtered)}>
                 <Download className="w-4 h-4 ml-2" />
@@ -442,10 +442,10 @@ export default function CodesPage() {
                 const StatusIcon = sc.icon;
                 const course = courses.find((c) => c.id === code.course_id);
                 return (
-                  <div key={code.id} className="p-4 flex items-center gap-4">
+                  <div key={code.id} className="p-4 flex flex-wrap items-center gap-3 sm:gap-4">
                     {/* Code */}
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-mono font-bold text-foreground tracking-widest text-sm bg-muted px-3 py-1.5 rounded-lg">
+                      <span className="font-mono font-bold text-foreground tracking-widest text-sm bg-muted px-3 py-1.5 rounded-lg break-all">
                         {code.code}
                       </span>
                       {code.status === "active" && (
@@ -472,13 +472,13 @@ export default function CodesPage() {
                     </span>
 
                     {/* Course name */}
-                    <span className="text-sm text-muted-foreground flex-1 truncate">
+                    <span className="text-sm text-muted-foreground min-w-0 flex-1 basis-full sm:basis-auto truncate">
                       {course?.title ||
                         (code.code_type === "bundle" ? "باقة" : "—")}
                     </span>
 
                     {/* Date */}
-                    <span className="text-xs text-muted-foreground hidden md:block shrink-0">
+                    <span className="text-xs text-muted-foreground shrink-0">
                       {code.used_at
                         ? `استُخدم ${new Date(code.used_at).toLocaleDateString("ar-EG")}`
                         : code.expires_at
@@ -487,7 +487,7 @@ export default function CodesPage() {
                     </span>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0 mr-auto sm:mr-0">
                       {isTeacher && code.status === "active" && (
                         <Button
                           size="sm"

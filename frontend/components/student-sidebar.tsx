@@ -62,7 +62,7 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
       {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40"
           onClick={onClose}
         />
       )}
@@ -70,7 +70,7 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 right-0 z-50 h-full w-72 bg-card border-l border-border transform transition-transform duration-300 lg:translate-x-0 lg:static lg:z-auto",
+          "fixed top-0 right-0 z-50 h-full w-72 bg-card border-l border-border transform transition-transform duration-300",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
@@ -90,7 +90,7 @@ export function StudentSidebar({ isOpen, onClose }: StudentSidebarProps) {
               </Link>
               <button
                 onClick={onClose}
-                className="lg:hidden p-1 rounded-md hover:bg-muted"
+                className="p-1 rounded-md hover:bg-muted"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>

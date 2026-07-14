@@ -46,15 +46,15 @@ export default function DashboardLayout({
         {/* Header — ظاهر دايماً */}
         <header className="sticky top-0 z-30 bg-background border-b border-border px-4 h-16 flex items-center justify-between">
 
-          {/* زرار الـ sidebar — موبايل بس */}
+          {/* زرار الـ sidebar */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-md hover:bg-muted"
+            className="p-2 rounded-md hover:bg-muted"
           >
             <Menu className="w-6 h-6" />
           </button>
 
-          <div className="hidden lg:block" />
+          <div />
 
           {/* الأيقونات */}
           <div className="flex items-center gap-1">

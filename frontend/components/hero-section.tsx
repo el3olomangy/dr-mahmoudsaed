@@ -34,7 +34,7 @@ export function HeroSection() {
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0">
               منصة تعليمية متكاملة مع الدكتور{" "}
               <span className="font-bold text-foreground">محمود سعيد</span>
-              {" "}لطلاب الثانوية العامة
+              {" "}لطلاب الثانوية العامة و البكالوريا و المرحلة الاعدادية
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -52,6 +52,14 @@ export function HeroSection() {
                 className="border-secondary text-secondary hover:bg-secondary hover:text-secondary-foreground text-lg px-8 py-6"
               >
                 <Link href="/parent">متابعة ولي الأمر</Link>
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                asChild 
+                className="border-primary text-primary hover:bg-primary hover:text-primary-foreground text-lg px-8 py-6"
+              >
+                <Link href="/login">تسجيل الدخول</Link>
               </Button>
             </div>
           </div>

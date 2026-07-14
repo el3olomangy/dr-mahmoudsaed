@@ -26,6 +26,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",
+    "http://192.168.1.13:3000",
     # أضف domain الإنتاج هنا لما ترفع
     # "https://el3olomangy.com",
     # "https://www.el3olomangy.com",

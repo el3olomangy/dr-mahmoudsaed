@@ -45,8 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const parsedUser = JSON.parse(savedUser)
           setToken(savedToken)
           setUser(parsedUser)
-          document.cookie = `token=${savedToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
-          document.cookie = `user_role=${parsedUser.role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+          document.cookie = `token=${savedToken}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
+          document.cookie = `user_role=${parsedUser.role}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
 
           // جيب أحدث بيانات المستخدم من الـ API (خصوصاً enrolled_courses)
           try {
@@ -76,8 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("token", newToken)
     localStorage.setItem("user", JSON.stringify(newUser))
     if (refreshToken) localStorage.setItem("refresh_token", refreshToken)
-    document.cookie = `token=${newToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
-    document.cookie = `user_role=${newUser.role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+    document.cookie = `token=${newToken}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
+    document.cookie = `user_role=${newUser.role}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
     setToken(newToken)
     setUser(newUser)
   }, [])

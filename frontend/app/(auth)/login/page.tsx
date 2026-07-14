@@ -6,7 +6,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Phone, Lock, ArrowLeft, HeadphonesIcon, X } from "lucide-react"
+import { Phone, Lock, ArrowLeft, HeadphonesIcon, X, Eye, EyeOff } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { authAPI } from "@/lib/api"
@@ -15,6 +15,7 @@ import { useAuth } from "@/context/AuthContext"
 export default function LoginPage() {
   const [phone, setPhone] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
@@ -29,10 +30,22 @@ export default function LoginPage() {
     }
   }, [searchParams])
 
+  const generateUUID = () => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID()
+    }
+    // fallback لو المتصفح مش شغال في سياق آمن (HTTPS/localhost)
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0
+      const v = c === "x" ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+
   const getDeviceId = () => {
     let deviceId = localStorage.getItem("device_id")
     if (!deviceId) {
-      deviceId = crypto.randomUUID()
+      deviceId = generateUUID()
       localStorage.setItem("device_id", deviceId)
     }
     return deviceId
@@ -189,13 +202,21 @@ export default function LoginPage() {
                 <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="********"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10"
+                  className="pr-10 pl-10"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
             </div>
 

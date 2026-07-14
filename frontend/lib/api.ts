@@ -5,11 +5,55 @@
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
 
+let refreshPromise: Promise<boolean> | null = null
+
+function clearSessionAndRedirect() {
+  if (typeof window === "undefined") return
+  localStorage.removeItem("token")
+  localStorage.removeItem("refresh_token")
+  localStorage.removeItem("user")
+  document.cookie = "token=; path=/; max-age=0"
+  document.cookie = "user_role=; path=/; max-age=0"
+  window.location.href = "/login"
+}
+
+// يحاول يجدد الـ access token باستخدام الـ refresh token المحفوظ
+// عشان المستخدم يفضل مسجل دخول لحد ما يغيّر الباسورد أو الـ refresh token ينتهي فعليًا
+async function tryRefreshToken(): Promise<boolean> {
+  if (typeof window === "undefined") return false
+  const refreshToken = localStorage.getItem("refresh_token")
+  if (!refreshToken) return false
+
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        })
+        if (!res.ok) return false
+        const data = await res.json()
+        localStorage.setItem("token", data.access_token)
+        if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token)
+        document.cookie = `token=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
+        return true
+      } catch {
+        return false
+      } finally {
+        refreshPromise = null
+      }
+    })()
+  }
+  return refreshPromise
+}
+
 async function request(
   endpoint: string,
   options: RequestInit = {},
-  isFormData = false
-) {
+  isFormData = false,
+  isRetry = false
+): Promise<any> {
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null
 
@@ -32,14 +76,14 @@ async function request(
   })
 
   if (res.status === 401) {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token")
-      localStorage.removeItem("refresh_token")
-      localStorage.removeItem("user")
-      document.cookie = "token=; path=/; max-age=0"
-      document.cookie = "user_role=; path=/; max-age=0"
-      window.location.href = "/login"
+    // لو أول مرة يفشل الطلب، جرب تجديد الـ token قبل ما تسجل خروج المستخدم
+    if (!isRetry && endpoint !== "/auth/refresh" && endpoint !== "/auth/login") {
+      const refreshed = await tryRefreshToken()
+      if (refreshed) {
+        return request(endpoint, options, isFormData, true)
+      }
     }
+    clearSessionAndRedirect()
     throw new Error("غير مصرح")
   }
 
@@ -530,4 +574,18 @@ export const uploadAPI = {
 
     return res.json()
   },
+}
+
+// ============================================================
+// GRADE IMAGES (صور بطاقات السنوات الدراسية في الصفحة الرئيسية)
+// ============================================================
+
+export const gradeImagesAPI = {
+  getAll: (): Promise<Record<string, string>> => request("/grade-images/"),
+
+  update: (grade: string, image_url: string) =>
+    request(`/grade-images/${grade}`, {
+      method: "PATCH",
+      body: JSON.stringify({ image_url }),
+    }),
 }

@@ -75,7 +75,7 @@
 }
 
 @theme inline {
-  --font-sans: Tahoma, Arial, sans-serif;
+  --font-sans: 'Almarai', Tahoma, Arial, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --color-background: var(--background);
   --color-foreground: var(--foreground);
